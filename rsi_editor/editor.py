@@ -2,12 +2,18 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
-import PIL as PIL
-import PIL.ImageQt as PILQt
-
 from rsi import Rsi
 
+from .EditableLabel import EditableLabel
+from .FlowLayout import FlowLayout
+from .StateIcon import StateIcon
+
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
+
+# TODO: Have this be configured by zooming in and out
+iconSize = QtC.QSize(50, 50)
+# What factor of icon size the state names are allowed to be
+stateNameFactor = 1.2
 
 class CurrentRsi():
     def __init__(self, rsi, path):
@@ -17,17 +23,13 @@ class CurrentRsi():
 
     def close(self):
         if self.dirty:
-            if not self.save():
-                return False
+            return False
 
         return True
 
     def save(self):
-        if self.path is None or self.path == '':
-            (self.path, _ ) = QtW.QFileDialog.getSaveFileName(self, 'Save RSI File', dir='', filter=rsiFileFilter)
-
-            if self.rsiPath == '':
-                return False
+        if not self.hasPath():
+            return False
 
         self.rsi.write(self.path)
         self.dirty = False
@@ -35,6 +37,39 @@ class CurrentRsi():
 
     def states(self):
         return self.rsi.states
+
+    def size(self):
+        return self.rsi.size
+
+    def license(self):
+        return self.rsi.license or ''
+
+    def copyright(self):
+        return self.rsi.copyright or ''
+
+    def hasPath(self):
+        return self.path is not None and self.path != ''
+
+    def setPath(self, path):
+        self.path = path
+
+    @QtC.Slot()
+    def updateLicense(self, licenseText):
+        if self.rsi.license != licenseText:
+            self.rsi.license = licenseText
+            self.dirty = True
+
+    @QtC.Slot()
+    def updateCopyright(self, copyrightText):
+        if self.rsi.copyright != copyrightText:
+            self.rsi.copyright = copyrightText
+            self.dirty = True
+
+    def renameState(self, oldStateName, newStateName):
+        state = self.rsi.get_state(oldStateName)
+        self.rsi.states.pop(oldStateName)
+        self.rsi.set_state(state, newStateName)
+        self.dirty = True
 
 class EditorWindow(QtW.QMainWindow):
     def __init__(self):
@@ -78,43 +113,68 @@ class EditorWindow(QtW.QMainWindow):
         splitter.setOrientation(QtC.Qt.Vertical)
 
         stateGroupBox = QtW.QGroupBox("States")
-        stateBox = QtW.QHBoxLayout()
+        stateLayout = FlowLayout()
 
         for stateName in self.currentRsi.states():
             state = self.currentRsi.states()[stateName]
-            if len(state.icons[0]) == 0:
-                image = PIL.Image.new('RGB', self.currentRsi.size)
-            else:
-                image = state.icons[0][0]
 
-            stateLabel = QtW.QLabel()
-            stateLabel.setPixmap(QtG.QPixmap.fromImage(PILQt.ImageQt(image)))
+            stateIcon = StateIcon(state, iconSize)
+            
+            stateNameLabel = EditableLabel(stateName)
+            stateNameLabel.setMaximumWidth(stateIcon.iconWidth * stateNameFactor)
+            stateNameLabel.edited.connect(self.renameState)
 
-            stateBox.addWidget(stateLabel)
+            stateCombinedLayout = QtW.QVBoxLayout()
+
+            stateCombinedLayout.addWidget(stateIcon, alignment=QtC.Qt.AlignHCenter)
+            stateCombinedLayout.addWidget(stateNameLabel, alignment=QtC.Qt.AlignHCenter)
+
+            stateCombined = QtW.QWidget()
+            stateCombined.setLayout(stateCombinedLayout)
+
+            stateLayout.addWidget(stateCombined)
 
 
-        stateGroupBox.setLayout(stateBox)
+        stateGroupBox.setLayout(stateLayout)
         splitter.addWidget(stateGroupBox)
 
-        bottomLabel = QtW.QLabel()
-        bottomLabel.setText("This is where the config goes.")
-        splitter.addWidget(bottomLabel)
+        configGroupBox = QtW.QGroupBox("Metadata")
+        configLayout = QtW.QFormLayout()
+
+        (x, y) = self.currentRsi.size()
+        configLayout.addRow("Size:", QtW.QLabel(f'x: {x}, y: {y}'))
+        
+        license = self.currentRsi.license()
+        licenseInput = QtW.QLineEdit()
+        licenseInput.setText(license)
+        licenseInput.textChanged.connect(self.currentRsi.updateLicense)
+        configLayout.addRow("License:", licenseInput)
+
+        copyright = self.currentRsi.copyright()
+        copyrightInput = QtW.QLineEdit()
+        copyrightInput.setText(copyright)
+        copyrightInput.textChanged.connect(self.currentRsi.updateCopyright)
+        configLayout.addRow("Copyright:", copyrightInput)
+
+        configGroupBox.setLayout(configLayout)
+        splitter.addWidget(configGroupBox)
 
         self.setCentralWidget(splitter)
 
     @QtC.Slot()
     def newRsi(self):
-        if self.currentRsi is not None:
-            if not self.currentRsi.close():
-                return
+        if not self.closeCurrentRsi():
+            return
 
         # TODO: get RSI size values in input
-        self.currentRsi = Rsi((32, 32))
+        self.currentRsi = CurrentRsi(Rsi((32, 32)), None)
         self.reloadRsi()
 
     @QtC.Slot()
     def openRsi(self):
-        #(rsiFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Open RSI File', dir='', filter=rsiFileFilter)
+        if not self.closeCurrentRsi():
+            return
+
         rsiFile = QtW.QFileDialog.getExistingDirectory(self, 'Open RSI')
 
         if rsiFile == '':
@@ -125,10 +185,44 @@ class EditorWindow(QtW.QMainWindow):
 
     @QtC.Slot()
     def saveRsi(self):
-        if self.currentRsi is None:
-            return
+        if not self.currentRsi.hasPath():
+            rsiPath = QtW.QFileDialog.getExistingDirectory(self, 'Save RSI')
+
+            if rsiPath == '':
+                return False
+
+            self.currentRsi.setPath(rsiPath)
 
         self.currentRsi.save()
+        return True
+
+    def closeCurrentRsi(self):
+        # TODO: Make this a proper "Do you want to save" dialog
+        if self.currentRsi is not None:
+            if not self.currentRsi.close():
+                if self.saveRsi():
+                    self.currentRsi.close()
+                    return True
+                else:
+                    return False
+            else:
+                return True
+        else:
+            return True
+
+    @QtC.Slot()
+    def renameState(self, oldStateName, newStateName):
+        if oldStateName == newStateName:
+            return
+
+        states = self.currentRsi.states()
+
+        if newStateName in states:
+            # TODO: confirm overwrite
+            return
+
+        self.currentRsi.renameState(oldStateName, newStateName)
+        self.reloadRsi()
 
 def editor():
     app = QtW.QApplication([])
