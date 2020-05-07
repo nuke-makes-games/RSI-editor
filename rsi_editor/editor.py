@@ -4,16 +4,13 @@ import PySide2.QtWidgets as QtW
 
 from rsi import Rsi
 
-from .EditableLabel import EditableLabel
 from .FlowLayout import FlowLayout
-from .Icon import Icon 
+from .LabelledIcon import LabelledIcon
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 
 # TODO: Have this be configured by zooming in and out
 iconSize = QtC.QSize(50, 50)
-# What factor of icon size the state names are allowed to be
-stateNameFactor = 1.2
 
 class CurrentRsi():
     def __init__(self, rsi, path):
@@ -65,6 +62,7 @@ class CurrentRsi():
             self.rsi.copyright = copyrightText
             self.dirty = True
 
+    @QtC.Slot()
     def renameState(self, oldStateName, newStateName):
         state = self.rsi.get_state(oldStateName)
         self.rsi.states.pop(oldStateName)
@@ -136,24 +134,11 @@ class EditorWindow(QtW.QMainWindow):
                 frameNumber = 0
                 for (image, delay) in self.currentState.frames(direction):
                     frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
-                    frameIcon = Icon(frameID, image, iconSize)
+                    frameIcon = LabelledIcon(frameID, str(delay), image, iconSize)
+
                     #TODO: Editing the frame!
-                    #stateIcon.drillDown.connect(self.openState)
-            
-                    delayLabel = EditableLabel(str(delay))
-                    delayLabel.setMaximumWidth(frameIcon.iconWidth * stateNameFactor)
                     #TODO: Changing the delay
-                    #delayLabel.edited.connect
-
-                    frameCombinedLayout = QtW.QVBoxLayout()
-
-                    frameCombinedLayout.addWidget(frameIcon, alignment=QtC.Qt.AlignHCenter)
-                    frameCombinedLayout.addWidget(delayLabel, alignment=QtC.Qt.AlignHCenter)
-
-                    frameCombined = QtW.QWidget()
-                    frameCombined.setLayout(frameCombinedLayout)
-
-                    stateContentsGrid.addWidget(frameCombined, direction, frameNumber)
+                    stateContentsGrid.addWidget(frameIcon, direction, frameNumber)
 
                     frameNumber = frameNumber + 1
 
@@ -178,22 +163,12 @@ class EditorWindow(QtW.QMainWindow):
             else:
                 image = state.icons[0][0]
 
-            stateIcon = Icon(stateName, image, iconSize)
-            stateIcon.drillDown.connect(self.openState)
+            stateIcon = LabelledIcon(stateName, stateName, image, iconSize)
             
-            stateNameLabel = EditableLabel(stateName)
-            stateNameLabel.setMaximumWidth(stateIcon.iconWidth * stateNameFactor)
-            stateNameLabel.edited.connect(self.renameState)
-
-            stateCombinedLayout = QtW.QVBoxLayout()
-
-            stateCombinedLayout.addWidget(stateIcon, alignment=QtC.Qt.AlignHCenter)
-            stateCombinedLayout.addWidget(stateNameLabel, alignment=QtC.Qt.AlignHCenter)
-
-            stateCombined = QtW.QWidget()
-            stateCombined.setLayout(stateCombinedLayout)
-
-            stateLayout.addWidget(stateCombined)
+            stateIcon.drillDown.connect(self.openState)
+            stateIcon.labelEdited.connect(self.renameState)
+            
+            stateLayout.addWidget(stateIcon)
 
 
         stateGroupBox.setLayout(stateLayout)
