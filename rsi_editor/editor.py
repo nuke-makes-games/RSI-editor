@@ -6,7 +6,7 @@ from rsi import Rsi
 
 from .EditableLabel import EditableLabel
 from .FlowLayout import FlowLayout
-from .State import StateIcon, FrameIcon
+from .Icon import Icon 
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 
@@ -135,7 +135,8 @@ class EditorWindow(QtW.QMainWindow):
             for direction in range(self.currentState.directions()):
                 frameNumber = 0
                 for (image, delay) in self.currentState.frames(direction):
-                    frameIcon = FrameIcon(image, iconSize)
+                    frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
+                    frameIcon = Icon(frameID, image, iconSize)
                     #TODO: Editing the frame!
                     #stateIcon.drillDown.connect(self.openState)
             
@@ -171,7 +172,13 @@ class EditorWindow(QtW.QMainWindow):
         for stateName in self.currentRsi.states():
             state = self.currentRsi.states()[stateName]
 
-            stateIcon = StateIcon(state, iconSize)
+
+            if len(state.icons[0]) == 0:
+                image = PIL.Image.new('RGB', self.currentRsi.size)
+            else:
+                image = state.icons[0][0]
+
+            stateIcon = Icon(stateName, image, iconSize)
             stateIcon.drillDown.connect(self.openState)
             
             stateNameLabel = EditableLabel(stateName)
