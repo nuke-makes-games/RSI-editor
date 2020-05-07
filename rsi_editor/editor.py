@@ -6,7 +6,7 @@ from rsi import Rsi
 
 from .EditableLabel import EditableLabel
 from .FlowLayout import FlowLayout
-from .StateIcon import StateIcon
+from .State import StateIcon, FrameIcon
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 
@@ -68,8 +68,23 @@ class CurrentRsi():
     def renameState(self, oldStateName, newStateName):
         state = self.rsi.get_state(oldStateName)
         self.rsi.states.pop(oldStateName)
+        state.name = newStateName
         self.rsi.set_state(state, newStateName)
         self.dirty = True
+
+class CurrentState():
+    def __init__(self, parentRsi, stateName):
+        self.parentRsi = parentRsi
+        self.state = self.parentRsi.states()[stateName]
+
+    def name(self):
+        return self.state.name
+
+    def directions(self):
+        return self.state.directions
+
+    def frames(self, direction):
+        return zip(self.state.icons[direction], self.state.delays[direction])
 
 class EditorWindow(QtW.QMainWindow):
     def __init__(self):
@@ -78,6 +93,7 @@ class EditorWindow(QtW.QMainWindow):
         self.editorMenu()
 
         self.currentRsi = None
+        self.currentState = None
         self.reloadRsi()
 
 
@@ -112,6 +128,43 @@ class EditorWindow(QtW.QMainWindow):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
+        if self.currentState is not None:
+            stateContentsGroupBox = QtW.QGroupBox(self.currentState.name())
+            stateContentsGrid = QtW.QGridLayout()
+
+            for direction in range(self.currentState.directions()):
+                frameNumber = 0
+                for (image, delay) in self.currentState.frames(direction):
+                    frameIcon = FrameIcon(image, iconSize)
+                    #TODO: Editing the frame!
+                    #stateIcon.drillDown.connect(self.openState)
+            
+                    delayLabel = EditableLabel(str(delay))
+                    delayLabel.setMaximumWidth(frameIcon.iconWidth * stateNameFactor)
+                    #TODO: Changing the delay
+                    #delayLabel.edited.connect
+
+                    frameCombinedLayout = QtW.QVBoxLayout()
+
+                    frameCombinedLayout.addWidget(frameIcon, alignment=QtC.Qt.AlignHCenter)
+                    frameCombinedLayout.addWidget(delayLabel, alignment=QtC.Qt.AlignHCenter)
+
+                    frameCombined = QtW.QWidget()
+                    frameCombined.setLayout(frameCombinedLayout)
+
+                    stateContentsGrid.addWidget(frameCombined, direction, frameNumber)
+
+                    frameNumber = frameNumber + 1
+
+            stateContentsGroupBox.setLayout(stateContentsGrid)
+            stateContentsGroupBox.setFlat(True)
+
+            scrollableStateContents = QtW.QScrollArea()
+            scrollableStateContents.setWidget(stateContentsGroupBox)
+            scrollableStateContents.setAlignment(QtC.Qt.AlignLeft)
+
+            splitter.addWidget(scrollableStateContents)
+
         stateGroupBox = QtW.QGroupBox("States")
         stateLayout = FlowLayout()
 
@@ -119,6 +172,7 @@ class EditorWindow(QtW.QMainWindow):
             state = self.currentRsi.states()[stateName]
 
             stateIcon = StateIcon(state, iconSize)
+            stateIcon.drillDown.connect(self.openState)
             
             stateNameLabel = EditableLabel(stateName)
             stateNameLabel.setMaximumWidth(stateIcon.iconWidth * stateNameFactor)
@@ -136,7 +190,13 @@ class EditorWindow(QtW.QMainWindow):
 
 
         stateGroupBox.setLayout(stateLayout)
-        splitter.addWidget(stateGroupBox)
+        stateGroupBox.setFlat(True)
+
+        scrollableState = QtW.QScrollArea()
+        scrollableState.setWidget(stateGroupBox)
+        scrollableState.setWidgetResizable(True)
+
+        splitter.addWidget(scrollableState)
 
         configGroupBox = QtW.QGroupBox("Metadata")
         configLayout = QtW.QFormLayout()
@@ -202,6 +262,8 @@ class EditorWindow(QtW.QMainWindow):
             if not self.currentRsi.close():
                 if self.saveRsi():
                     self.currentRsi.close()
+                    self.currentRsi = None
+                    self.currentState = None
                     return True
                 else:
                     return False
@@ -209,6 +271,11 @@ class EditorWindow(QtW.QMainWindow):
                 return True
         else:
             return True
+
+    @QtC.Slot()
+    def openState(self, stateName):
+        self.currentState = CurrentState(self.currentRsi, stateName)
+        self.reloadRsi()
 
     @QtC.Slot()
     def renameState(self, oldStateName, newStateName):

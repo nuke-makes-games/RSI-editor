@@ -43,4 +43,5 @@ class EditableLabel(QtW.QWidget):
     @QtC.Slot()
     def relabel(self):
         self.edited.emit(self.label.text(), self.lineEdit.text())
+        self.stack.setCurrentIndex(self.labelIndex)
 

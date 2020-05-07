@@ -28,4 +28,15 @@ class StateIcon(QtW.QLabel):
         self.iconWidth = statePixmap.width()
 
     def mouseDoubleClickEvent(self, event):
-        drillDown.emit(self.state.name)
+        self.drillDown.emit(self.state.name)
+
+class FrameIcon(QtW.QLabel):
+    def __init__(self, image, iconSize):
+        QtW.QLabel.__init__(self)
+        
+        framePixmap = QtG.QPixmap.fromImage(PILQt.ImageQt(image))
+        framePixmap = framePixmap.scaled(iconSize)
+
+        QtW.QLabel.setPixmap(self, framePixmap)
+
+        self.iconWidth = framePixmap.width()
