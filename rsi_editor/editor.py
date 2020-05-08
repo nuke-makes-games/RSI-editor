@@ -6,6 +6,7 @@ from rsi import Rsi
 
 from .FlowLayout import FlowLayout
 from .LabelledIcon import LabelledIcon
+from .PixmapAnimation import PixmapAnimation
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 
@@ -17,9 +18,10 @@ class CurrentRsi():
         self.rsi = rsi
         self.path = path
         self.dirty = False
+        self.currentState = None
 
-    def close(self):
-        if self.dirty:
+    def close(self, force=False):
+        if self.dirty and not force:
             return False
 
         return True
@@ -70,6 +72,9 @@ class CurrentRsi():
         self.rsi.set_state(state, newStateName)
         self.dirty = True
 
+    def openState(self, stateName):
+        self.currentState = CurrentState(self, stateName)
+
 class CurrentState():
     def __init__(self, parentRsi, stateName):
         self.parentRsi = parentRsi
@@ -91,7 +96,6 @@ class EditorWindow(QtW.QMainWindow):
         self.editorMenu()
 
         self.currentRsi = None
-        self.currentState = None
         self.reloadRsi()
 
 
@@ -126,21 +130,30 @@ class EditorWindow(QtW.QMainWindow):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
-        if self.currentState is not None:
-            stateContentsGroupBox = QtW.QGroupBox(self.currentState.name())
+        if self.currentRsi.currentState is not None:
+            stateContentsGroupBox = QtW.QGroupBox(self.currentRsi.currentState.name())
             stateContentsGrid = QtW.QGridLayout()
 
-            for direction in range(self.currentState.directions()):
+            for direction in range(self.currentRsi.currentState.directions()):
+                directionAnimLabel = QtW.QLabel()
+                directionAnim = QtC.QSequentialAnimationGroup(directionAnimLabel)
                 frameNumber = 0
-                for (image, delay) in self.currentState.frames(direction):
-                    frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
+
+                for (image, delay) in self.currentRsi.currentState.frames(direction):
+                    frameID = f'{self.currentRsi.currentState.name()}_{direction}_{frameNumber}'
                     frameIcon = LabelledIcon(frameID, str(delay), image, iconSize)
+
+                    directionAnim.addAnimation(PixmapAnimation(directionAnimLabel, frameIcon.icon.pixmap(), delay * 1000))
 
                     #TODO: Editing the frame!
                     #TODO: Changing the delay
                     stateContentsGrid.addWidget(frameIcon, direction, frameNumber)
 
                     frameNumber = frameNumber + 1
+
+                stateContentsGrid.addWidget(directionAnimLabel, direction, frameNumber)
+                directionAnim.setLoopCount(-1)
+                directionAnim.start()
 
             stateContentsGroupBox.setLayout(stateContentsGrid)
             stateContentsGroupBox.setFlat(True)
@@ -227,6 +240,9 @@ class EditorWindow(QtW.QMainWindow):
 
     @QtC.Slot()
     def saveRsi(self):
+        if self.currentRsi is None:
+            return
+
         if not self.currentRsi.hasPath():
             rsiPath = QtW.QFileDialog.getExistingDirectory(self, 'Save RSI')
 
@@ -239,24 +255,40 @@ class EditorWindow(QtW.QMainWindow):
         return True
 
     def closeCurrentRsi(self):
-        # TODO: Make this a proper "Do you want to save" dialog
         if self.currentRsi is not None:
             if not self.currentRsi.close():
-                if self.saveRsi():
-                    self.currentRsi.close()
-                    self.currentRsi = None
-                    self.currentState = None
-                    return True
-                else:
-                    return False
+                confirmCloseDialog = QtW.QMessageBox(
+                        QtW.QMessageBox.NoIcon,
+                        'Close without saving?', 
+                        'The RSI has unsaved changes - close it anyways?',
+                        parent=self,
+                        buttons=QtW.QMessageBox.Save|QtW.QMessageBox.Discard|QtW.QMessageBox.Cancel)
+
+                confirmCloseDialog.buttonClicked.connect(lambda button: self.closeCurrentRsiByDialog(confirmCloseDialog.buttonRole(button)))
+                confirmCloseDialog.exec()
+
+                return False
             else:
                 return True
         else:
             return True
 
     @QtC.Slot()
+    def closeCurrentRsiByDialog(self, buttonRole):
+        # Accept = save the file
+        if buttonRole == QtW.QMessageBox.AcceptRole:
+            if self.saveRsi():
+                self.currentRsi.closeRsi()
+        # Destructive = close without saving
+        if buttonRole == QtW.QMessageBox.DestructiveRole:
+            self.currentRsi.close(force=True)
+        # Reject = cancel closing
+        if buttonRole == QtW.MessageBox.RejectRole:
+            return
+
+    @QtC.Slot()
     def openState(self, stateName):
-        self.currentState = CurrentState(self.currentRsi, stateName)
+        self.currentRsi.openState(stateName)
         self.reloadRsi()
 
     @QtC.Slot()
