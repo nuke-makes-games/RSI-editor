@@ -2,219 +2,170 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
-from rsi import Rsi
-
 from .FlowLayout import FlowLayout
 from .LabelledIcon import LabelledIcon
 from .PixmapAnimation import PixmapAnimation
+
+from .Rsi import Rsi, State
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 
 # TODO: Have this be configured by zooming in and out
 iconSize = QtC.QSize(50, 50)
 
-class CurrentRsi():
-    def __init__(self, rsi, path):
-        self.rsi = rsi
-        self.path = path
-        self.dirty = False
-        self.currentState = None
-
-    def close(self, force=False):
-        if self.dirty and not force:
-            return False
-
-        return True
-
-    def save(self):
-        if not self.hasPath():
-            return False
-
-        self.rsi.write(self.path)
-        self.dirty = False
-        return True
-
-    def states(self):
-        return self.rsi.states
-
-    def size(self):
-        return self.rsi.size
-
-    def license(self):
-        return self.rsi.license or ''
-
-    def copyright(self):
-        return self.rsi.copyright or ''
-
-    def hasPath(self):
-        return self.path is not None and self.path != ''
-
-    def setPath(self, path):
-        self.path = path
-
-    @QtC.Slot()
-    def updateLicense(self, licenseText):
-        if self.rsi.license != licenseText:
-            self.rsi.license = licenseText
-            self.dirty = True
-
-    @QtC.Slot()
-    def updateCopyright(self, copyrightText):
-        if self.rsi.copyright != copyrightText:
-            self.rsi.copyright = copyrightText
-            self.dirty = True
-
-    @QtC.Slot()
-    def renameState(self, oldStateName, newStateName):
-        state = self.rsi.get_state(oldStateName)
-        self.rsi.states.pop(oldStateName)
-        state.name = newStateName
-        self.rsi.set_state(state, newStateName)
-        self.dirty = True
-
-    def openState(self, stateName):
-        self.currentState = CurrentState(self, stateName)
-
-class CurrentState():
-    def __init__(self, parentRsi, stateName):
-        self.parentRsi = parentRsi
-        self.state = self.parentRsi.states()[stateName]
-
-    def name(self):
-        return self.state.name
-
-    def directions(self):
-        return self.state.directions
-
-    def frames(self, direction):
-        return zip(self.state.icons[direction], self.state.delays[direction])
-
 class EditorWindow(QtW.QMainWindow):
     def __init__(self):
         QtW.QMainWindow.__init__(self)
         self.setWindowTitle("RSI editor")
+
+        self.undoStack = QtW.QUndoStack(self)
+        
         self.editorMenu()
 
+        # TODO: Reload session information
         self.currentRsi = None
-        self.reloadRsi()
+        self.currentState = None
 
+        self.contentLayout()
 
     def editorMenu(self):
         fileMenu = self.menuBar().addMenu("&File")
 
-        newAction = fileMenu.addAction("&New")
-        openAction = fileMenu.addAction("&Open")
-        saveAction = fileMenu.addAction("&Save")
-        fileMenu.addSeparator()
-        preferencesAction = fileMenu.addAction("Preferences")
-
         # Set up new RSI
+        newAction = fileMenu.addAction("&New")
         newAction.setShortcut(QtG.QKeySequence.New)
         newAction.triggered.connect(self.newRsi)
 
         # Set up file opening
+        openAction = fileMenu.addAction("&Open")
         openAction.setShortcut(QtG.QKeySequence.Open)
         openAction.triggered.connect(self.openRsi)
 
         # Set up file saving
+        saveAction = fileMenu.addAction("&Save")
         saveAction.setShortcut(QtG.QKeySequence.Save)
         saveAction.triggered.connect(self.saveRsi)
 
-        # Set up preferences
+        saveAsAction = fileMenu.addAction("Save As")
+        saveAsAction.setShortcut(QtG.QKeySequence.SaveAs)
+        saveAsAction.triggered.connect(self.saveAsRsi)
+        
+        fileMenu.addSeparator()
+
+        # TODO: Set up preferences
+        preferencesAction = fileMenu.addAction("Preferences")
         preferencesAction.setShortcut(QtG.QKeySequence.Preferences)
 
-    def reloadRsi(self):
-        if self.currentRsi is None:
-            return
+        editMenu = self.menuBar().addMenu("&Edit")
 
+        # Undo
+        undoAction = editMenu.addAction("&Undo")
+        undoAction.setShortcut(QtG.QKeySequence.Undo)
+        undoAction.triggered.connect(self.undoStack.undo)
+
+        # Redo
+        redoAction = editMenu.addAction("&Redo")
+        redoAction.setShortcut(QtG.QKeySequence.Redo)
+        redoAction.triggered.connect(self.undoStack.redo)
+
+    def contentLayout(self):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
-        if self.currentRsi.currentState is not None:
-            stateContentsGroupBox = QtW.QGroupBox(self.currentRsi.currentState.name())
-            stateContentsGrid = QtW.QGridLayout()
+        self.stateContentsGroupBox = QtW.QGroupBox("")
+        self.stateContentsGroupBox.setLayout(QtW.QGridLayout(self.stateContentsGroupBox))
+        
+        self.stateGroupBox = QtW.QGroupBox("States")
+        self.stateGroupBox.setLayout(FlowLayout(self.stateGroupBox))
+        
+        self.configGroupBox = QtW.QGroupBox("Metadata")
+        self.configGroupBox.setLayout(QtW.QFormLayout(self.configGroupBox))
+            
+        scrollableStateContents = QtW.QScrollArea()
+        scrollableStateContents.setWidget(self.stateContentsGroupBox)
+        scrollableStateContents.setAlignment(QtC.Qt.AlignLeft)
+        scrollableStateContents.setWidgetResizable(True)
 
-            for direction in range(self.currentRsi.currentState.directions()):
+        scrollableState = QtW.QScrollArea()
+        scrollableState.setWidget(self.stateGroupBox)
+        scrollableStateContents.setAlignment(QtC.Qt.AlignLeft)
+        scrollableState.setWidgetResizable(True)
+
+        splitter.addWidget(scrollableStateContents)
+        splitter.addWidget(scrollableState)
+        splitter.addWidget(self.configGroupBox)
+
+        self.setCentralWidget(splitter)
+
+    def clearLayout(self, layout):
+        while layout.count() > 0:
+            child = layout.takeAt(0)
+            if child.widget() is not None:
+                child.widget().setParent(None)
+
+    def reloadRsi(self):
+        # Clear the grid
+        self.clearLayout(self.stateContentsGroupBox.layout())
+
+        if self.currentState is not None:
+
+            for direction in range(self.currentState.directions()):
                 directionAnimLabel = QtW.QLabel()
                 directionAnim = QtC.QSequentialAnimationGroup(directionAnimLabel)
                 frameNumber = 0
 
-                for (image, delay) in self.currentRsi.currentState.frames(direction):
-                    frameID = f'{self.currentRsi.currentState.name()}_{direction}_{frameNumber}'
+                for (image, delay) in self.currentState.frames(direction):
+                    frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
                     frameIcon = LabelledIcon(frameID, str(delay), image, iconSize)
+                    frameIcon.setSizePolicy(QtW.QSizePolicy.Fixed, QtW.QSizePolicy.Fixed)
 
                     directionAnim.addAnimation(PixmapAnimation(directionAnimLabel, frameIcon.icon.pixmap(), delay * 1000))
 
                     #TODO: Editing the frame!
                     #TODO: Changing the delay
-                    stateContentsGrid.addWidget(frameIcon, direction, frameNumber)
+                    self.stateContentsGroupBox.layout().addWidget(frameIcon, direction, frameNumber)
 
                     frameNumber = frameNumber + 1
 
-                stateContentsGrid.addWidget(directionAnimLabel, direction, frameNumber)
+                self.stateContentsGroupBox.layout().addWidget(directionAnimLabel, direction, frameNumber)
                 directionAnim.setLoopCount(-1)
                 directionAnim.start()
 
-            stateContentsGroupBox.setLayout(stateContentsGrid)
-            stateContentsGroupBox.setFlat(True)
+            self.stateContentsGroupBox.layout().update()
 
-            scrollableStateContents = QtW.QScrollArea()
-            scrollableStateContents.setWidget(stateContentsGroupBox)
-            scrollableStateContents.setAlignment(QtC.Qt.AlignLeft)
+        self.clearLayout(self.stateGroupBox.layout())
+        self.clearLayout(self.configGroupBox.layout())
 
-            splitter.addWidget(scrollableStateContents)
+        if self.currentRsi is not None:
+            for stateName in self.currentRsi.states():
+                state = self.currentRsi.states()[stateName]
 
-        stateGroupBox = QtW.QGroupBox("States")
-        stateLayout = FlowLayout()
+                if len(state.icons[0]) == 0:
+                    image = PIL.Image.new('RGB', self.currentRsi.size)
+                else:
+                    image = state.icons[0][0]
 
-        for stateName in self.currentRsi.states():
-            state = self.currentRsi.states()[stateName]
+                stateIcon = LabelledIcon(stateName, stateName, image, iconSize)
+                
+                stateIcon.drillDown.connect(self.openState)
+                stateIcon.labelEdited.connect(self.renameState)
+                
+                self.stateGroupBox.layout().addWidget(stateIcon)
 
-
-            if len(state.icons[0]) == 0:
-                image = PIL.Image.new('RGB', self.currentRsi.size)
-            else:
-                image = state.icons[0][0]
-
-            stateIcon = LabelledIcon(stateName, stateName, image, iconSize)
+            (x, y) = self.currentRsi.size()
+            self.configGroupBox.layout().addRow("Size:", QtW.QLabel(f'x: {x}, y: {y}'))
             
-            stateIcon.drillDown.connect(self.openState)
-            stateIcon.labelEdited.connect(self.renameState)
-            
-            stateLayout.addWidget(stateIcon)
+            license = self.currentRsi.license()
+            licenseInput = QtW.QLineEdit()
+            licenseInput.setText(license)
+            licenseInput.textChanged.connect(self.currentRsi.setLicense)
+            self.configGroupBox.layout().addRow("License:", licenseInput)
 
-
-        stateGroupBox.setLayout(stateLayout)
-        stateGroupBox.setFlat(True)
-
-        scrollableState = QtW.QScrollArea()
-        scrollableState.setWidget(stateGroupBox)
-        scrollableState.setWidgetResizable(True)
-
-        splitter.addWidget(scrollableState)
-
-        configGroupBox = QtW.QGroupBox("Metadata")
-        configLayout = QtW.QFormLayout()
-
-        (x, y) = self.currentRsi.size()
-        configLayout.addRow("Size:", QtW.QLabel(f'x: {x}, y: {y}'))
-        
-        license = self.currentRsi.license()
-        licenseInput = QtW.QLineEdit()
-        licenseInput.setText(license)
-        licenseInput.textChanged.connect(self.currentRsi.updateLicense)
-        configLayout.addRow("License:", licenseInput)
-
-        copyright = self.currentRsi.copyright()
-        copyrightInput = QtW.QLineEdit()
-        copyrightInput.setText(copyright)
-        copyrightInput.textChanged.connect(self.currentRsi.updateCopyright)
-        configLayout.addRow("Copyright:", copyrightInput)
-
-        configGroupBox.setLayout(configLayout)
-        splitter.addWidget(configGroupBox)
-
-        self.setCentralWidget(splitter)
+            copyright = self.currentRsi.copyright()
+            copyrightInput = QtW.QLineEdit()
+            copyrightInput.setText(copyright)
+            copyrightInput.textChanged.connect(self.currentRsi.setCopyright)
+            self.configGroupBox.layout().addRow("Copyright:", copyrightInput)
 
     @QtC.Slot()
     def newRsi(self):
@@ -222,7 +173,7 @@ class EditorWindow(QtW.QMainWindow):
             return
 
         # TODO: get RSI size values in input
-        self.currentRsi = CurrentRsi(Rsi((32, 32)), None)
+        self.currentRsi = Rsi.new(32, 32)
         self.reloadRsi()
 
     @QtC.Slot()
@@ -235,60 +186,68 @@ class EditorWindow(QtW.QMainWindow):
         if rsiFile == '':
             return
 
-        self.currentRsi = CurrentRsi(Rsi.open(rsiFile), rsiFile)
+        self.currentRsi = Rsi.fromFile(rsiFile)
+        self.setWindowFilePath(rsiFile)
+
         self.reloadRsi()
 
     @QtC.Slot()
     def saveRsi(self):
         if self.currentRsi is None:
-            return
+            return False
 
-        if not self.currentRsi.hasPath():
-            rsiPath = QtW.QFileDialog.getExistingDirectory(self, 'Save RSI')
+        if self.windowFilePath() is None and not self.setRsiPath():
+            return False
 
-            if rsiPath == '':
-                return False
+        self.currentRsi.save(self.windowFilePath())
+        return True
 
-            self.currentRsi.setPath(rsiPath)
+    @QtC.Slot()
+    def saveAsRsi(self):
+        if self.currentRsi is None:
+            return False
 
-        self.currentRsi.save()
+        if not self.setRsiPath():
+            return False
+
+        return self.saveRsi()
+
+    def setRsiPath(self):
+        rsiPath = QtW.QFileDialog.getExistingDirectory(self, 'Save RSI')
+
+        if rsiPath == '':
+            return False
+
+        self.setWindowFilePath(rsiPath)
         return True
 
     def closeCurrentRsi(self):
-        if self.currentRsi is not None:
-            if not self.currentRsi.close():
-                confirmCloseDialog = QtW.QMessageBox(
-                        QtW.QMessageBox.NoIcon,
-                        'Close without saving?', 
-                        'The RSI has unsaved changes - close it anyways?',
-                        parent=self,
-                        buttons=QtW.QMessageBox.Save|QtW.QMessageBox.Discard|QtW.QMessageBox.Cancel)
+        if self.currentRsi is not None and self.isWindowModified():
+            confirmCloseReply = QtW.question(
+                    self,
+                    'Close without saving?', 
+                    'The RSI has unsaved changes - close it anyways?',
+                    buttons=QtW.QMessageBox.Save|QtW.QMessageBox.Discard|QtW.QMessageBox.Cancel,
+                    defaultButton=QtW.QMessageBox.Save)
 
-                confirmCloseDialog.buttonClicked.connect(lambda button: self.closeCurrentRsiByDialog(confirmCloseDialog.buttonRole(button)))
-                confirmCloseDialog.exec()
-
-                return False
-            else:
-                return True
+            if confirmCloseReply == QtW.QMessageBox.Save:
+                response = self.saveRsi()
+            if confirmCloseReply == QtW.QMessageBox.Discard:
+                response = True
+            if confirmCloseReply == QtW.QMessageBox.Cancel:
+                response = False
         else:
-            return True
+            response = True
 
-    @QtC.Slot()
-    def closeCurrentRsiByDialog(self, buttonRole):
-        # Accept = save the file
-        if buttonRole == QtW.QMessageBox.AcceptRole:
-            if self.saveRsi():
-                self.currentRsi.closeRsi()
-        # Destructive = close without saving
-        if buttonRole == QtW.QMessageBox.DestructiveRole:
-            self.currentRsi.close(force=True)
-        # Reject = cancel closing
-        if buttonRole == QtW.MessageBox.RejectRole:
-            return
+        if response:
+            self.currentRsi = None
+            self.currentState = None
+
+        return response
 
     @QtC.Slot()
     def openState(self, stateName):
-        self.currentRsi.openState(stateName)
+        self.currentState = State(self.currentRsi, stateName)
         self.reloadRsi()
 
     @QtC.Slot()
