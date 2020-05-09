@@ -83,12 +83,12 @@ class FlowLayout(QLayout):
         return True
 
     def heightForWidth(self, width):
-        height = self.doLayout(QRect(0, 0, width, 0), True)
+        (_, height) = self.getRectangles(QRect(0, 0, width, 0))
         return height
 
     def setGeometry(self, rect):
         super(FlowLayout, self).setGeometry(rect)
-        self.doLayout(rect, False)
+        self.doLayout(rect)
 
     def sizeHint(self):
         return self.minimumSize()
@@ -104,10 +104,19 @@ class FlowLayout(QLayout):
         size += QSize(2 * margin, 2 * margin)
         return size
 
-    def doLayout(self, rect, testOnly):
+    def doLayout(self, rect):
+        (rectangles, _) = self.getRectangles(rect)
+        for i in range(len(self.itemList)):
+            self.itemList[i].setGeometry(rectangles[i])
+
+    # Get the rectangles for the items in this layout
+    # Return value is (<list of rectangles>, <total height>)
+    def getRectangles(self, rect):
         x = rect.x()
         y = rect.y()
         lineHeight = 0
+
+        rectangles = []
 
         for item in self.itemList:
             wid = item.widget()
@@ -120,10 +129,19 @@ class FlowLayout(QLayout):
                 nextX = x + item.sizeHint().width() + spaceX
                 lineHeight = 0
 
-            if not testOnly:
-                item.setGeometry(QRect(QPoint(x, y), item.sizeHint()))
+            rectangles.append(QRect(QPoint(x, y), item.sizeHint()))
 
             x = nextX
             lineHeight = max(lineHeight, item.sizeHint().height())
 
-        return y + lineHeight - rect.y()
+        return (rectangles, y + lineHeight - rect.y())
+
+    def indexContaining(self, point):
+        (rectangles, _) = self.getRectangles(self.contentRect())
+
+        for i in range(len(rectangles)):
+            rectangle = rectangles[i]
+            if rectangle.contains(point):
+                return i
+
+        return None
