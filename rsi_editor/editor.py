@@ -2,15 +2,10 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
-from .LabelledIcon import LabelledIcon
 from .PixmapAnimation import PixmapAnimation
-
 from .Rsi import Rsi, State
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
-
-# TODO: Have this be configured by zooming in and out
-iconSize = QtC.QSize(50, 50)
 
 class EditorWindow(QtW.QMainWindow):
     def __init__(self):
@@ -78,7 +73,6 @@ class EditorWindow(QtW.QMainWindow):
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
         self.stateList.setMovement(QtW.QListView.Snap)
-        self.stateList.setGridSize(QtC.QSize(60, 60))
         self.stateList.setSelectionRectVisible(True)
         self.stateList.setUniformItemSizes(True)
         self.stateList.setWordWrap(True)

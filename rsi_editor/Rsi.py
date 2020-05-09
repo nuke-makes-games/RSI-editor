@@ -6,6 +6,9 @@ import PIL.ImageQt as PILQt
 
 import rsi
 
+# TODO: Have this be configured by zooming in and out
+iconSize = QtC.QSize(100, 100)
+
 # Wrapper class around the RSI API, for use in the editor
 class Rsi():
     # Constructors
@@ -88,7 +91,7 @@ class StateListModel(QtC.QAbstractListModel):
                 image = state.icons[0][0]
 
             statePixmap = QtG.QPixmap.fromImage(PILQt.ImageQt(image))
-            statePixmap = statePixmap.scaled(QtC.QSize(60, 60))
+            statePixmap = statePixmap.scaled(iconSize)
             stateIcon = QtG.QIcon(statePixmap)
 
             return stateIcon
@@ -176,7 +179,7 @@ class StateModel(QtC.QAbstractTableModel):
                 image = frameInfo[0]
 
                 framePixmap = QtG.QPixmap.fromImage(PILQt.ImageQt(image))
-                framePixmap = framePixmap.scaled(QtC.QSize(60, 60))
+                framePixmap = framePixmap.scaled(iconSize)
                 frameIcon = QtG.QIcon(framePixmap)
 
                 return frameIcon
