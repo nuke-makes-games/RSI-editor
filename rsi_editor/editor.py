@@ -19,7 +19,7 @@ class EditorWindow(QtW.QMainWindow):
         self.setWindowTitle("RSI editor")
 
         self.undoStack = QtW.QUndoStack(self)
-        
+
         self.editorMenu()
 
         # TODO: Reload session information
@@ -49,7 +49,7 @@ class EditorWindow(QtW.QMainWindow):
         saveAsAction = fileMenu.addAction("Save As")
         saveAsAction.setShortcut(QtG.QKeySequence.SaveAs)
         saveAsAction.triggered.connect(self.saveAsRsi)
-        
+
         fileMenu.addSeparator()
 
         # TODO: Set up preferences
@@ -72,27 +72,25 @@ class EditorWindow(QtW.QMainWindow):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
-        self.stateContentsGroupBox = QtW.QGroupBox("")
-        self.stateContentsGroupBox.setLayout(QtW.QGridLayout(self.stateContentsGroupBox))
-        
-        self.stateGroupBox = QtW.QGroupBox("States")
-        self.stateGroupBox.setLayout(FlowLayout(self.stateGroupBox))
-        
+        self.stateContents = QtW.QTableView()
+        self.stateContents.setSortingEnabled(False)
+        self.stateContents.setGridStyle(QtC.Qt.NoPen)
+
+        self.stateList = QtW.QListView()
+        self.stateList.setViewMode(QtW.QListView.IconMode)
+        self.stateList.setMovement(QtW.QListView.Snap)
+        self.stateList.setGridSize(QtC.QSize(60, 60))
+        self.stateList.setSelectionRectVisible(True)
+        self.stateList.setUniformItemSizes(True)
+        self.stateList.setWordWrap(True)
+        self.stateList.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
+        self.stateList.clicked.connect(self.stateListDrillDown)
+
         self.configGroupBox = QtW.QGroupBox("Metadata")
         self.configGroupBox.setLayout(QtW.QFormLayout(self.configGroupBox))
-            
-        scrollableStateContents = QtW.QScrollArea()
-        scrollableStateContents.setWidget(self.stateContentsGroupBox)
-        scrollableStateContents.setAlignment(QtC.Qt.AlignLeft)
-        scrollableStateContents.setWidgetResizable(True)
 
-        scrollableState = QtW.QScrollArea()
-        scrollableState.setWidget(self.stateGroupBox)
-        scrollableStateContents.setAlignment(QtC.Qt.AlignLeft)
-        scrollableState.setWidgetResizable(True)
-
-        splitter.addWidget(scrollableStateContents)
-        splitter.addWidget(scrollableState)
+        splitter.addWidget(self.stateContents)
+        splitter.addWidget(self.stateList)
         splitter.addWidget(self.configGroupBox)
 
         self.setCentralWidget(splitter)
@@ -105,56 +103,42 @@ class EditorWindow(QtW.QMainWindow):
 
     def reloadRsi(self):
         # Clear the grid
-        self.clearLayout(self.stateContentsGroupBox.layout())
+        self.stateContents.reset()
 
         if self.currentState is not None:
+            self.stateContents.setModel(self.currentState.model)
 
-            for direction in range(self.currentState.directions()):
-                directionAnimLabel = QtW.QLabel()
-                directionAnim = QtC.QSequentialAnimationGroup(directionAnimLabel)
-                frameNumber = 0
+            #for direction in range(self.currentState.directions()):
+            #    directionAnimLabel = QtW.QLabel()
+            #    directionAnim = QtC.QSequentialAnimationGroup(directionAnimLabel)
+            #    frameNumber = 0
 
-                for (image, delay) in self.currentState.frames(direction):
-                    frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
-                    frameIcon = LabelledIcon(frameID, str(delay), image, iconSize)
-                    frameIcon.setSizePolicy(QtW.QSizePolicy.Fixed, QtW.QSizePolicy.Fixed)
+            #    for (image, delay) in self.currentState.frames(direction):
+            #        frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
+            #        frameIcon = LabelledIcon(frameID, str(delay), image, iconSize)
+            #        frameIcon.setSizePolicy(QtW.QSizePolicy.Fixed, QtW.QSizePolicy.Fixed)
 
-                    directionAnim.addAnimation(PixmapAnimation(directionAnimLabel, frameIcon.icon.pixmap(), delay * 1000))
+            #        directionAnim.addAnimation(PixmapAnimation(directionAnimLabel, frameIcon.icon.pixmap(), delay * 1000))
 
-                    #TODO: Editing the frame!
-                    #TODO: Changing the delay
-                    self.stateContentsGroupBox.layout().addWidget(frameIcon, direction, frameNumber)
+            #        #TODO: Editing the frame!
+            #        #TODO: Changing the delay
+            #        self.stateContentsGroupBox.layout().addWidget(frameIcon, direction, frameNumber)
 
-                    frameNumber = frameNumber + 1
+            #        frameNumber = frameNumber + 1
 
-                self.stateContentsGroupBox.layout().addWidget(directionAnimLabel, direction, frameNumber)
-                directionAnim.setLoopCount(-1)
-                directionAnim.start()
+            #    self.stateContentsGroupBox.layout().addWidget(directionAnimLabel, direction, frameNumber)
+            #    directionAnim.setLoopCount(-1)
+            #    directionAnim.start()
 
-            self.stateContentsGroupBox.layout().update()
-
-        self.clearLayout(self.stateGroupBox.layout())
+        self.stateList.reset()
         self.clearLayout(self.configGroupBox.layout())
 
         if self.currentRsi is not None:
-            for stateName in self.currentRsi.states():
-                state = self.currentRsi.states()[stateName]
-
-                if len(state.icons[0]) == 0:
-                    image = PIL.Image.new('RGB', self.currentRsi.size)
-                else:
-                    image = state.icons[0][0]
-
-                stateIcon = LabelledIcon(stateName, stateName, image, iconSize)
-                
-                stateIcon.drillDown.connect(self.openState)
-                stateIcon.labelEdited.connect(self.renameState)
-                
-                self.stateGroupBox.layout().addWidget(stateIcon)
+            self.stateList.setModel(self.currentRsi.stateList)
 
             (x, y) = self.currentRsi.size()
             self.configGroupBox.layout().addRow("Size:", QtW.QLabel(f'x: {x}, y: {y}'))
-            
+
             license = self.currentRsi.license()
             licenseInput = QtW.QLineEdit()
             licenseInput.setText(license)
@@ -225,7 +209,7 @@ class EditorWindow(QtW.QMainWindow):
         if self.currentRsi is not None and self.isWindowModified():
             confirmCloseReply = QtW.question(
                     self,
-                    'Close without saving?', 
+                    'Close without saving?',
                     'The RSI has unsaved changes - close it anyways?',
                     buttons=QtW.QMessageBox.Save|QtW.QMessageBox.Discard|QtW.QMessageBox.Cancel,
                     defaultButton=QtW.QMessageBox.Save)
@@ -246,8 +230,9 @@ class EditorWindow(QtW.QMainWindow):
         return response
 
     @QtC.Slot()
-    def openState(self, stateName):
-        self.currentState = State(self.currentRsi, stateName)
+    def stateListDrillDown(self, stateListIndex):
+        state = self.stateList.model().getState(stateListIndex)
+        self.currentState = State(self.currentRsi, state.name)
         self.reloadRsi()
 
     @QtC.Slot()
