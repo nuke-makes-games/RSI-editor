@@ -87,8 +87,9 @@ class StateListModel(QtC.QAbstractListModel):
             else:
                 image = state.icons[0][0]
 
-            stateImage = PILQt.ImageQt(image)
-            stateIcon = QtG.QIcon(QtG.QPixmap.fromImage(stateImage))
+            statePixmap = QtG.QPixmap.fromImage(PILQt.ImageQt(image))
+            statePixmap = statePixmap.scaled(QtC.QSize(60, 60))
+            stateIcon = QtG.QIcon(statePixmap)
 
             return stateIcon
 
@@ -124,10 +125,20 @@ class State():
 
     # Convenience function - get pairs of images and delays for the given direction
     def frames(self, direction):
-        return list(zip(self.state.icons[direction], self.state.delays[direction]))
+        return list(zip(self.state.icons[direction], self.getDelays(direction)))
+
+    def getDelays(self, direction):
+        if self.state.delays[direction] == []:
+            return [None]
+        else:
+            return self.state.delays[direction]
 
     def setDelay(self, direction, frame, delay):
-        self.state.delays[direction][frame] = delay
+        # The only way this happens is if there is 1 frame
+        if self.state.delays[direction] == []:
+            self.state.delays[direction] = [delay]
+        else:
+            self.state.delays[direction][frame] = delay
 
 class StateModel(QtC.QAbstractTableModel):
     def __init__(self, state, parent = None):
@@ -164,8 +175,9 @@ class StateModel(QtC.QAbstractTableModel):
             if role == QtC.Qt.DecorationRole:
                 image = frameInfo[0]
 
-                frameImage = PILQt.ImageQt(image)
-                frameIcon = QtG.QIcon(QtG.QPixmap.fromImage(frameImage))
+                framePixmap = QtG.QPixmap.fromImage(PILQt.ImageQt(image))
+                framePixmap = framePixmap.scaled(QtC.QSize(60, 60))
+                frameIcon = QtG.QIcon(framePixmap)
 
                 return frameIcon
         else:
