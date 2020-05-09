@@ -2,7 +2,6 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
-from .FlowLayout import FlowLayout
 from .LabelledIcon import LabelledIcon
 from .PixmapAnimation import PixmapAnimation
 
