@@ -65,6 +65,9 @@ class Rsi():
             return True
         return False
 
+# Custom view/model role - for getting and setting PIL Images
+ImageRole = QtC.Qt.UserRole
+
 class StateListModel(QtC.QAbstractListModel):
     def __init__(self, rsi, parent = None):
         QtC.QAbstractListModel.__init__(self, parent)
@@ -143,6 +146,9 @@ class State():
         else:
             self.state.delays[direction][frame] = delay
 
+    def setImage(self, direction, frame, image):
+        self.state.icons[direction][frame] = image.copy()
+
 class StateModel(QtC.QAbstractTableModel):
     def __init__(self, state, parent = None):
         QtC.QAbstractTableModel.__init__(self, parent)
@@ -183,6 +189,8 @@ class StateModel(QtC.QAbstractTableModel):
                 frameIcon = QtG.QIcon(framePixmap)
 
                 return frameIcon
+            if role == ImageRole:
+                return frameInfo[0]
         else:
             return None
 
@@ -201,13 +209,22 @@ class StateModel(QtC.QAbstractTableModel):
 
         (direction, frame) = dirFrame
 
-        if isinstance(value, str):
-            try:
-                value = float(value)
-            except ValueError:
-                return False
+        if role == QtC.Qt.EditRole:
+            if isinstance(value, str):
+                try:
+                    value = float(value)
+                except ValueError:
+                    return False
 
-        self.state.setDelay(direction, frame, value)
-        self.dataChanged.emit(index, index)
-        return True
+            if self.state.setDelay(direction, frame, value):
+                self.dataChanged.emit(index, index)
+                return True
+            return False
+
+        if role == ImageRole:
+            self.state.setImage(direction, frame, value)
+            self.dataChanged.emit(index, index)
+            return True
+
+        return False
 

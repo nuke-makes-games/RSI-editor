@@ -2,18 +2,26 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
+from .Rsi import ImageRole
+
 # Like a table, but does animation summaries
 class AnimationView(QtW.QWidget):
+    clicked = QtC.Signal(QtC.QModelIndex)
+
     def __init__(self, parent=None):
         QtW.QWidget.__init__(self, parent)
 
         self.table = QtW.QTableView(parent=self)
         self.table.setSortingEnabled(False)
         self.table.setGridStyle(QtC.Qt.NoPen)
+        self.table.clicked.connect(self.clicked.emit)
 
         layout = QtW.QHBoxLayout()
         layout.addWidget(self.table)
         self.setLayout(layout)
+
+    def model(self):
+        return self.table.model()
 
     def setModel(self, model):
         animationModel = AnimationModel(model)
@@ -154,6 +162,12 @@ class AnimationModel(QtC.QAbstractItemModel):
         if result:
             self.dataChanged.emit(index, index)
         return result
+
+    def frame(self, index):
+        return self.data(index, role=ImageRole)
+
+    def setFrame(self, index, image):
+        return self.setData(index, image, role=ImageRole)
 
 # Special kind of animation that does nothing other than hold on to an index
 # so that we can track it later

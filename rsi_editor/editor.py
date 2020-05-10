@@ -2,6 +2,7 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
+from .ImageEditor import ImageEditor
 from .PixmapAnimation import PixmapAnimation
 from .Rsi import Rsi, State
 from .AnimationView import AnimationView 
@@ -69,6 +70,7 @@ class EditorWindow(QtW.QMainWindow):
 
         self.stateContents = AnimationView()
         #self.stateContents.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
+        self.stateContents.clicked.connect(self.stateContentsDrillDown)
 
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
@@ -210,6 +212,15 @@ class EditorWindow(QtW.QMainWindow):
         state = self.stateList.model().getState(stateListIndex)
         self.currentState = State(self.currentRsi, state.name)
         self.reloadRsi()
+
+    @QtC.Slot()
+    def stateContentsDrillDown(self, stateIndex):
+        image = self.stateContents.model().frame(stateIndex)
+        edited = ImageEditor.editImage(image)
+
+        if edited is not None:
+            self.stateContents.model().setFrame(stateIndex, edited)
+
 
     @QtC.Slot()
     def renameState(self, oldStateName, newStateName):
