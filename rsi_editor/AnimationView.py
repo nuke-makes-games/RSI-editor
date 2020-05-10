@@ -66,8 +66,8 @@ class AnimationModel(QtC.QAbstractItemModel):
         for column in range(self.innerModel.columnCount(QtC.QModelIndex())):
             currentIndex = self.innerModel.index(row, column)
 
-            frameDelay = self.innerModel.data(currentIndex)
-            if frameDelay is not None:
+            frameDelay = self.innerModel.data(currentIndex, role=QtC.Qt.DisplayRole)
+            if isinstance(frameDelay, float):
                 animGroup.addAnimation(SummaryFrame(currentIndex, frameDelay, parent=self))
             else:
                 break
@@ -92,11 +92,47 @@ class AnimationModel(QtC.QAbstractItemModel):
     def parent(self, _child):
         return QtC.QModelIndex()
 
+    # TODO: Nice icons for directions
+    def headerData(self, section, orientation, role=QtC.Qt.DisplayRole):
+        if orientation == QtC.Qt.Vertical:
+            if self.rowCount(QtC.QModelIndex()) == 1:
+                if role == QtC.Qt.DisplayRole:
+                    return 'All'
+                return None
+            else:
+                if role == QtC.Qt.DisplayRole:
+                    if section == 0:
+                        return 'South'
+                    if section == 1:
+                        return 'North'
+                    if section == 2:
+                        return 'East'
+                    if section == 3:
+                        return 'West'
+                    if section == 4:
+                        return 'South East'
+                    if section == 5:
+                        return 'South West'
+                    if section == 6:
+                        return 'North East'
+                    if section == 7:
+                        return 'North West'
+                return None
+        else:
+            if role == QtC.Qt.DisplayRole:
+                if section < self.summaryColumn:
+                    return f'Frame {section + 1}'
+                return 'Animated'
+            return None
+
+
     def data(self, index, role=QtC.Qt.DisplayRole):
         if index.column() == self.summaryColumn:
             if role == QtC.Qt.DecorationRole:
                 currentFrame = self.animations[index.row()].currentAnimation()
-                return self.innerModel.data(currentFrame.index, role)
+                # Some directions may have no animation
+                if currentFrame is not None:
+                    return self.innerModel.data(currentFrame.index, role)
             if role == QtC.Qt.DisplayRole:
                 return ''
 
@@ -119,6 +155,8 @@ class AnimationModel(QtC.QAbstractItemModel):
             self.dataChanged.emit(index, index)
         return result
 
+# Special kind of animation that does nothing other than hold on to an index
+# so that we can track it later
 class SummaryFrame(QtC.QAbstractAnimation):
     def __init__(self, index, delay, parent=None):
         QtC.QAbstractAnimation.__init__(self, parent)

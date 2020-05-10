@@ -201,6 +201,12 @@ class StateModel(QtC.QAbstractTableModel):
 
         (direction, frame) = dirFrame
 
+        if isinstance(value, str):
+            try:
+                value = float(value)
+            except ValueError:
+                return False
+
         self.state.setDelay(direction, frame, value)
         self.dataChanged.emit(index, index)
         return True
