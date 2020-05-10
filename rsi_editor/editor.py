@@ -4,6 +4,7 @@ import PySide2.QtWidgets as QtW
 
 from .PixmapAnimation import PixmapAnimation
 from .Rsi import Rsi, State
+from .AnimationView import AnimationView 
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 
@@ -66,9 +67,8 @@ class EditorWindow(QtW.QMainWindow):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
-        self.stateContents = QtW.QTableView()
-        self.stateContents.setSortingEnabled(False)
-        self.stateContents.setGridStyle(QtC.Qt.NoPen)
+        self.stateContents = AnimationView()
+        self.stateContents.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
 
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
