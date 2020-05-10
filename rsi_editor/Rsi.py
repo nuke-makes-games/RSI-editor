@@ -96,7 +96,7 @@ class StateListModel(QtC.QAbstractListModel):
 
             return stateIcon
 
-    def flags(self, _index):
+    def lags(self, _index):
         # All states have the same flags
         return QtC.Qt.ItemIsSelectable | QtC.Qt.ItemIsEditable | QtC.Qt.ItemIsEnabled | QtC.Qt.ItemNeverHasChildren
 

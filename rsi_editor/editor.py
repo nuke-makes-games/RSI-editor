@@ -68,7 +68,7 @@ class EditorWindow(QtW.QMainWindow):
         splitter.setOrientation(QtC.Qt.Vertical)
 
         self.stateContents = AnimationView()
-        self.stateContents.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
+        #self.stateContents.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
 
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
@@ -79,11 +79,16 @@ class EditorWindow(QtW.QMainWindow):
         self.stateList.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
         self.stateList.clicked.connect(self.stateListDrillDown)
 
+        stateLayout = QtW.QHBoxLayout()
+        stateLayout.addWidget(self.stateList)
+        stateWidget = QtW.QWidget()
+        stateWidget.setLayout(stateLayout)
+
         self.configGroupBox = QtW.QGroupBox("Metadata")
         self.configGroupBox.setLayout(QtW.QFormLayout(self.configGroupBox))
 
         splitter.addWidget(self.stateContents)
-        splitter.addWidget(self.stateList)
+        splitter.addWidget(stateWidget)
         splitter.addWidget(self.configGroupBox)
 
         self.setCentralWidget(splitter)
@@ -100,28 +105,6 @@ class EditorWindow(QtW.QMainWindow):
 
         if self.currentState is not None:
             self.stateContents.setModel(self.currentState.model)
-
-            #for direction in range(self.currentState.directions()):
-            #    directionAnimLabel = QtW.QLabel()
-            #    directionAnim = QtC.QSequentialAnimationGroup(directionAnimLabel)
-            #    frameNumber = 0
-
-            #    for (image, delay) in self.currentState.frames(direction):
-            #        frameID = f'{self.currentState.name()}_{direction}_{frameNumber}'
-            #        frameIcon = LabelledIcon(frameID, str(delay), image, iconSize)
-            #        frameIcon.setSizePolicy(QtW.QSizePolicy.Fixed, QtW.QSizePolicy.Fixed)
-
-            #        directionAnim.addAnimation(PixmapAnimation(directionAnimLabel, frameIcon.icon.pixmap(), delay * 1000))
-
-            #        #TODO: Editing the frame!
-            #        #TODO: Changing the delay
-            #        self.stateContentsGroupBox.layout().addWidget(frameIcon, direction, frameNumber)
-
-            #        frameNumber = frameNumber + 1
-
-            #    self.stateContentsGroupBox.layout().addWidget(directionAnimLabel, direction, frameNumber)
-            #    directionAnim.setLoopCount(-1)
-            #    directionAnim.start()
 
         self.stateList.reset()
         self.clearLayout(self.configGroupBox.layout())
