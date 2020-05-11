@@ -195,7 +195,36 @@ class StateModel(QtC.QAbstractTableModel):
         else:
             return None
 
-    # No header data yet...
+    # TODO: Nice icons for directions
+    def headerData(self, section, orientation, role=QtC.Qt.DisplayRole):
+        if orientation == QtC.Qt.Vertical:
+            if self.rowCount(QtC.QModelIndex()) == 1:
+                if role == QtC.Qt.DisplayRole:
+                    return 'All'
+                return None
+            else:
+                if role == QtC.Qt.DisplayRole:
+                    if section == 0:
+                        return 'South'
+                    if section == 1:
+                        return 'North'
+                    if section == 2:
+                        return 'East'
+                    if section == 3:
+                        return 'West'
+                    if section == 4:
+                        return 'South East'
+                    if section == 5:
+                        return 'South West'
+                    if section == 6:
+                        return 'North East'
+                    if section == 7:
+                        return 'North West'
+                return None
+        else:
+            if role == QtC.Qt.DisplayRole:
+                return f'Frame {section + 1}'
+            return None
 
     def flags(self, index):
         if self.getDirFrame(index) is not None:

@@ -113,39 +113,6 @@ class AnimationModel(QtC.QAbstractItemModel):
     def parent(self, _child):
         return QtC.QModelIndex()
 
-    # TODO: Nice icons for directions
-    def headerData(self, section, orientation, role=QtC.Qt.DisplayRole):
-        if orientation == QtC.Qt.Vertical:
-            if self.rowCount(QtC.QModelIndex()) == 1:
-                if role == QtC.Qt.DisplayRole:
-                    return 'All'
-                return None
-            else:
-                if role == QtC.Qt.DisplayRole:
-                    if section == 0:
-                        return 'South'
-                    if section == 1:
-                        return 'North'
-                    if section == 2:
-                        return 'East'
-                    if section == 3:
-                        return 'West'
-                    if section == 4:
-                        return 'South East'
-                    if section == 5:
-                        return 'South West'
-                    if section == 6:
-                        return 'North East'
-                    if section == 7:
-                        return 'North West'
-                return None
-        else:
-            if role == QtC.Qt.DisplayRole:
-                if section < self.summaryColumn:
-                    return f'Frame {section + 1}'
-                return 'Animated'
-            return None
-
 
     def data(self, index, role=QtC.Qt.DisplayRole):
         if index.column() == self.summaryColumn:
@@ -165,6 +132,11 @@ class AnimationModel(QtC.QAbstractItemModel):
         if index.column() == self.summaryColumn:
             return QtC.Qt.ItemNeverHasChildren | QtC.Qt.ItemIsEnabled
         return self.innerModel.flags(index)
+
+    def headerData(self, section, orientation, role=QtC.Qt.DisplayRole):
+        if orientation == QtC.Qt.Horizontal and section == self.summaryColumn and role == QtC.Qt.DisplayRole:
+            return 'Animated'
+        return self.innerModel.headerData(section, orientation, role)
 
     def setData(self, index, value, role=QtC.Qt.EditRole):
         if index.column() == self.summaryColumn:
