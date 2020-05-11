@@ -5,6 +5,7 @@
 
 import PIL
 
+import os
 import subprocess
 import tempfile
 
@@ -20,7 +21,10 @@ class ImageEditor():
         # TODO: not hardcode this
         result = subprocess.run(["gimp", tempPath])
     
+        retValue = None
         if result.returncode == 0:
-            return PIL.Image.open(tempPath)
-        return None
+            retValue = PIL.Image.open(tempPath)
+
+        os.unlink(tempPath)
+        return retValue
 

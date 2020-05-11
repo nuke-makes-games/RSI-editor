@@ -69,7 +69,6 @@ class EditorWindow(QtW.QMainWindow):
         splitter.setOrientation(QtC.Qt.Vertical)
 
         self.stateContents = AnimationView()
-        #self.stateContents.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
         self.stateContents.clicked.connect(self.stateContentsDrillDown)
 
         self.stateList = QtW.QListView()
