@@ -14,6 +14,9 @@ class AnimationView(QtW.QWidget):
         self.table = QtW.QTableView(parent=self)
         self.table.setSortingEnabled(False)
         self.table.setGridStyle(QtC.Qt.NoPen)
+        self.table.horizontalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
         self.table.clicked.connect(self.clicked.emit)
 
         layout = QtW.QHBoxLayout()
@@ -29,6 +32,9 @@ class AnimationView(QtW.QWidget):
 
     def reset(self):
         self.table.reset()
+
+    def setIconSize(self, size):
+        self.table.setIconSize(size)
 
 # Wrapper model which also exposes animation summaries
 class AnimationModel(QtC.QAbstractItemModel):

@@ -4,7 +4,7 @@ import PySide2.QtWidgets as QtW
 
 from .ImageEditor import ImageEditor
 from .PixmapAnimation import PixmapAnimation
-from .Rsi import Rsi, State
+from .Rsi import Rsi, State, iconSize
 from .AnimationView import AnimationView 
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
@@ -69,10 +69,12 @@ class EditorWindow(QtW.QMainWindow):
         splitter.setOrientation(QtC.Qt.Vertical)
 
         self.stateContents = AnimationView()
+        self.stateContents.setIconSize(iconSize)
         self.stateContents.clicked.connect(self.stateContentsDrillDown)
 
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
+        self.stateList.setIconSize(iconSize)
         self.stateList.setMovement(QtW.QListView.Snap)
         self.stateList.setSelectionRectVisible(True)
         self.stateList.setUniformItemSizes(True)
