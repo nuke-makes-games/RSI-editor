@@ -6,6 +6,8 @@ from .Rsi import ImageRole
 
 # Like a table, but does animation summaries
 class AnimationView(QtW.QWidget):
+    edit = QtC.Signal(QtC.QModelIndex)
+
     def __init__(self, parent=None):
         QtW.QWidget.__init__(self, parent)
 
@@ -16,9 +18,16 @@ class AnimationView(QtW.QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
 
+        self.table.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
+
         layout = QtW.QHBoxLayout()
         layout.addWidget(self.table)
         self.setLayout(layout)
+
+        editorAction = QtW.QAction("Open in editor...", parent=self.table)
+        editorAction.triggered.connect(lambda _checked: self.edit.emit(self.table.currentIndex()))
+        
+        self.table.addAction(editorAction)
 
     def model(self):
         return self.table.model()
@@ -44,6 +53,7 @@ class AnimationModel(QtC.QAbstractItemModel):
         self.innerModel.dataChanged.connect(self.innerModelDataChanged)
 
     def innerModelDataChanged(self, topLeft, bottomRight, roles=list()):
+        print("Something is happening")
         # Some data has changed - so we need to regenerate the
         # animations in the summary. First, we calculate which
         # rows are different now
@@ -83,7 +93,7 @@ class AnimationModel(QtC.QAbstractItemModel):
             else:
                 break
 
-        animIndex = self.createIndex(row, self.summaryColumn)
+        animIndex = self.index(row, self.summaryColumn, QtC.QModelIndex())
         animGroup.currentAnimationChanged.connect(lambda _void: self.dataChanged.emit(animIndex, animIndex, [QtC.Qt.DecorationRole]))
         self.animations[row] = animGroup
         animGroup.setLoopCount(-1)

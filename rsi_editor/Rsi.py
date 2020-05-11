@@ -145,6 +145,7 @@ class State():
             self.state.delays[direction] = [delay]
         else:
             self.state.delays[direction][frame] = delay
+        return True
 
     def setImage(self, direction, frame, image):
         self.state.icons[direction][frame] = image.copy()
