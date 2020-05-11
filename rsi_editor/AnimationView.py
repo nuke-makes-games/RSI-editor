@@ -6,8 +6,6 @@ from .Rsi import ImageRole
 
 # Like a table, but does animation summaries
 class AnimationView(QtW.QWidget):
-    clicked = QtC.Signal(QtC.QModelIndex)
-
     def __init__(self, parent=None):
         QtW.QWidget.__init__(self, parent)
 
@@ -17,7 +15,6 @@ class AnimationView(QtW.QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
-        self.table.clicked.connect(self.clicked.emit)
 
         layout = QtW.QHBoxLayout()
         layout.addWidget(self.table)

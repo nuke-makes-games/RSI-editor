@@ -70,7 +70,6 @@ class EditorWindow(QtW.QMainWindow):
 
         self.stateContents = AnimationView()
         self.stateContents.setIconSize(iconSize)
-        self.stateContents.clicked.connect(self.stateContentsDrillDown)
 
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
@@ -209,7 +208,7 @@ class EditorWindow(QtW.QMainWindow):
         return response
 
     @QtC.Slot()
-    def stateListDrillDown(self, stateListIndex):
+    def stateListEdit(self, stateListIndex):
         state = self.stateList.model().getState(stateListIndex)
         self.currentState = State(self.currentRsi, state.name)
         self.reloadRsi()
