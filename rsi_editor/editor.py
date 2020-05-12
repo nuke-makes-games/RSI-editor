@@ -8,6 +8,7 @@ from .Rsi import Rsi, State, iconSize
 from .AnimationView import AnimationView 
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
+dmiFileFilter = 'DreamMaker Image (*.dmi)'
 
 class EditorWindow(QtW.QMainWindow):
     def __init__(self):
@@ -47,6 +48,11 @@ class EditorWindow(QtW.QMainWindow):
         saveAsAction = fileMenu.addAction("Save As")
         saveAsAction.setShortcut(QtG.QKeySequence.SaveAs)
         saveAsAction.triggered.connect(self.saveAsRsi)
+
+        fileMenu.addSeparator()
+
+        importAction = fileMenu.addAction("&Import")
+        importAction.triggered.connect(self.importDmi)
 
         fileMenu.addSeparator()
 
@@ -170,6 +176,7 @@ class EditorWindow(QtW.QMainWindow):
 
         # TODO: get RSI size values in input
         self.currentRsi = Rsi.new(32, 32)
+        self.setWindowPath('')
         self.setWindowModified(False)
         self.reloadRsi()
 
@@ -209,6 +216,22 @@ class EditorWindow(QtW.QMainWindow):
             return False
 
         return self.saveRsi()
+
+    @QtC.Slot()
+    def importDmi(self):
+        if not self.closeCurrentRsi():
+            return
+
+        (dmiFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import DMI', filter=dmiFileFilter)
+
+        if dmiFile == '':
+            return
+
+        self.currentRsi = Rsi.fromDmi(dmiFile)
+        self.setWindowFilePath('')
+        self.setWindowModified(True)
+
+        self.reloadRsi()
 
     def setRsiPath(self):
         rsiPath = QtW.QFileDialog.getExistingDirectory(self, 'Save RSI')

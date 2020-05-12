@@ -19,6 +19,9 @@ class Rsi():
     def fromFile(rsiPath):
         return Rsi(rsi.Rsi.open(rsiPath))
 
+    def fromDmi(dmiPath):
+        return Rsi(rsi.Rsi.from_dmi(dmiPath))
+
     def new(x, y):
         return Rsi(rsi.Rsi((x, y)))
 
