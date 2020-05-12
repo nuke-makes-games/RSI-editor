@@ -12,7 +12,7 @@ rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 class EditorWindow(QtW.QMainWindow):
     def __init__(self):
         QtW.QMainWindow.__init__(self)
-        self.setWindowTitle("RSI editor")
+        self.setWindowTitle("RSI editor[*]")
 
         self.undoStack = QtW.QUndoStack(self)
 
@@ -23,6 +23,8 @@ class EditorWindow(QtW.QMainWindow):
         self.currentState = None
 
         self.contentLayout()
+
+        self.contentMenus()
 
     def editorMenu(self):
         fileMenu = self.menuBar().addMenu("&File")
@@ -64,13 +66,32 @@ class EditorWindow(QtW.QMainWindow):
         redoAction.setShortcut(QtG.QKeySequence.Redo)
         redoAction.triggered.connect(self.undoStack.redo)
 
+    def contentMenus(self):
+        self.stateContentsMenu()
+
+    def stateContentsMenu(self):
+        editorAction = self.stateContents.addCellAction("Open in editor...")
+        editorAction.indexTriggered.connect(self.stateContentsEdit)
+
+        # TODO: important actions
+        #insertAction = self.stateContents.addCellAction("Insert image")
+        #insertAction.indexTriggered.connect(self.stateContentsInsert)
+
+        #insertFrameAction = self.stateContents.addCellAction("Insert frame")
+        #insertFrameAction.indexTriggered.connect(self.stateContentsInsertFrame)
+
+        #deleteAction = self.stateContents.addCellAction("Delete image")
+        #deleteAction.indexTriggered.connect(self.stateContentsDelete)
+
+        #deleteFrameAction = self.stateContents.addCellAction("Delete frame")
+        #deleteFrameAction.indexTriggered.connect(self.stateContentsDeleteFrame)
+
     def contentLayout(self):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
         self.stateContents = AnimationView()
         self.stateContents.setIconSize(iconSize)
-        self.stateContents.edit.connect(self.stateContentsEdit)
 
         self.stateList = QtW.QListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
@@ -86,21 +107,31 @@ class EditorWindow(QtW.QMainWindow):
         stateLayout.addWidget(self.stateList)
         stateWidget = QtW.QWidget()
         stateWidget.setLayout(stateLayout)
+        
+        self.sizeInfo = QtW.QLabel()
+
+        self.licenseInput = QtW.QLineEdit()
+        self.licenseInput.setEnabled(False)
+        self.licenseInput.editingFinished.connect(self.updateLicense)
+
+        self.copyrightInput = QtW.QLineEdit()
+        self.copyrightInput.setEnabled(False)
+        self.copyrightInput.editingFinished.connect(self.updateCopyright)
+        
+        configLayout = QtW.QFormLayout()
+        configLayout.addRow("Size:", self.sizeInfo)
+        configLayout.addRow("License:", self.licenseInput)
+        configLayout.addRow("Copyright:", self.copyrightInput) 
 
         self.configGroupBox = QtW.QGroupBox("Metadata")
-        self.configGroupBox.setLayout(QtW.QFormLayout(self.configGroupBox))
+        self.configGroupBox.setLayout(configLayout)
 
         splitter.addWidget(self.stateContents)
         splitter.addWidget(stateWidget)
         splitter.addWidget(self.configGroupBox)
 
-        self.setCentralWidget(splitter)
 
-    def clearLayout(self, layout):
-        while layout.count() > 0:
-            child = layout.takeAt(0)
-            if child.widget() is not None:
-                child.widget().setParent(None)
+        self.setCentralWidget(splitter)
 
     def reloadRsi(self):
         # Clear the grid
@@ -110,25 +141,27 @@ class EditorWindow(QtW.QMainWindow):
             self.stateContents.setModel(self.currentState.model)
 
         self.stateList.reset()
-        self.clearLayout(self.configGroupBox.layout())
 
         if self.currentRsi is not None:
             self.stateList.setModel(self.currentRsi.stateList)
 
             (x, y) = self.currentRsi.size()
-            self.configGroupBox.layout().addRow("Size:", QtW.QLabel(f'x: {x}, y: {y}'))
+            self.sizeInfo.setText(f'x: {x}, y: {y}')
 
             license = self.currentRsi.license()
-            licenseInput = QtW.QLineEdit()
-            licenseInput.setText(license)
-            licenseInput.textChanged.connect(self.currentRsi.setLicense)
-            self.configGroupBox.layout().addRow("License:", licenseInput)
+            self.licenseInput.setText(license)
+            self.licenseInput.setEnabled(True)
 
             copyright = self.currentRsi.copyright()
-            copyrightInput = QtW.QLineEdit()
-            copyrightInput.setText(copyright)
-            copyrightInput.textChanged.connect(self.currentRsi.setCopyright)
-            self.configGroupBox.layout().addRow("Copyright:", copyrightInput)
+            self.copyrightInput.setText(copyright)
+            self.copyrightInput.setEnabled(True)
+        else:
+            self.sizeInfo.setText('')
+            self.licenseInput.setText('')
+            self.licenseInput.setEnabled(False)
+            self.copyrightInput.setText('')
+            self.copyrightInput.setEnabled(False)
+    
 
     @QtC.Slot()
     def newRsi(self):
@@ -137,6 +170,7 @@ class EditorWindow(QtW.QMainWindow):
 
         # TODO: get RSI size values in input
         self.currentRsi = Rsi.new(32, 32)
+        self.setWindowModified(False)
         self.reloadRsi()
 
     @QtC.Slot()
@@ -151,6 +185,7 @@ class EditorWindow(QtW.QMainWindow):
 
         self.currentRsi = Rsi.fromFile(rsiFile)
         self.setWindowFilePath(rsiFile)
+        self.setWindowModified(False)
 
         self.reloadRsi()
 
@@ -186,7 +221,7 @@ class EditorWindow(QtW.QMainWindow):
 
     def closeCurrentRsi(self):
         if self.currentRsi is not None and self.isWindowModified():
-            confirmCloseReply = QtW.question(
+            confirmCloseReply = QtW.QMessageBox.question(
                     self,
                     'Close without saving?',
                     'The RSI has unsaved changes - close it anyways?',
@@ -236,6 +271,18 @@ class EditorWindow(QtW.QMainWindow):
 
         self.currentRsi.renameState(oldStateName, newStateName)
         self.reloadRsi()
+
+    @QtC.Slot()
+    def updateLicense(self):
+        if self.licenseInput.text() != self.currentRsi.license():
+            self.currentRsi.setLicense(self.licenseInput.text())
+            self.setWindowModified(True)
+
+    @QtC.Slot()
+    def updateCopyright(self):
+        if self.copyrightInput.text() != self.currentRsi.copyright():
+            self.currentRsi.setCopyright(self.copyrightInput.text())
+            self.setWindowModified(True)
 
 def editor():
     app = QtW.QApplication([])

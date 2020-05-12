@@ -6,8 +6,6 @@ from .Rsi import ImageRole
 
 # Like a table, but does animation summaries
 class AnimationView(QtW.QWidget):
-    edit = QtC.Signal(QtC.QModelIndex)
-
     def __init__(self, parent=None):
         QtW.QWidget.__init__(self, parent)
 
@@ -24,11 +22,6 @@ class AnimationView(QtW.QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
-        editorAction = QtW.QAction("Open in editor...", parent=self.table)
-        editorAction.triggered.connect(lambda _checked: self.edit.emit(self.table.currentIndex()))
-        
-        self.table.addAction(editorAction)
-
     def model(self):
         return self.table.model()
 
@@ -42,6 +35,19 @@ class AnimationView(QtW.QWidget):
     def setIconSize(self, size):
         self.table.setIconSize(size)
 
+    def addCellAction(self, actionText):
+        action = CellAction(actionText, self.table)
+        self.table.addAction(action)
+        return action
+
+class CellAction(QtW.QAction):
+    indexTriggered = QtC.Signal(QtC.QModelIndex)
+
+    def __init__(self, text, table):
+        QtW.QAction.__init__(self, text, parent=table)
+        self.table = table
+        self.triggered.connect(lambda _checked: self.indexTriggered.emit(self.table.currentIndex()))
+
 # Wrapper model which also exposes animation summaries
 class AnimationModel(QtC.QAbstractItemModel):
     def __init__(self, innerModel, parent = None):
@@ -53,7 +59,6 @@ class AnimationModel(QtC.QAbstractItemModel):
         self.innerModel.dataChanged.connect(self.innerModelDataChanged)
 
     def innerModelDataChanged(self, topLeft, bottomRight, roles=list()):
-        print("Something is happening")
         # Some data has changed - so we need to regenerate the
         # animations in the summary. First, we calculate which
         # rows are different now
@@ -112,7 +117,6 @@ class AnimationModel(QtC.QAbstractItemModel):
 
     def parent(self, _child):
         return QtC.QModelIndex()
-
 
     def data(self, index, role=QtC.Qt.DisplayRole):
         if index.column() == self.summaryColumn:
