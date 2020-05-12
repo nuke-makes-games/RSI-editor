@@ -3,7 +3,6 @@ import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
 from .ImageEditor import ImageEditor
-from .PixmapAnimation import PixmapAnimation
 from .Rsi import Rsi, State, iconSize
 from .AnimationView import AnimationView 
 
