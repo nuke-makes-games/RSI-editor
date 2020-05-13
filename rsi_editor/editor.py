@@ -149,27 +149,25 @@ class EditorWindow(QtW.QMainWindow):
     def reloadRsi(self):
         # Clear the grid
         self.stateContents.reset()
-
-        if self.currentState is not None:
-            self.stateContents.setModel(self.currentState.model)
-
         self.stateList.reset()
 
         if self.currentRsi is not None:
-            self.stateList.setModel(self.currentRsi.stateList)
+            self.stateList.setModel(self.currentRsi)
 
-            (x, y) = self.currentRsi.size()
+            self.currentRsi.stateRenamed.connect(self.renameState)
+
+            (x, y) = self.currentRsi.size
             self.sizeInfo.setText(f'x: {x}, y: {y}')
 
-            license = self.currentRsi.license()
+            license = self.currentRsi.license
             self.licenseInput.setText(license)
             self.licenseInput.setEnabled(True)
-            self.currentRsi.licenseChanged.connect(lambda : self.licenseInput.setText(self.currentRsi.license()))
+            self.currentRsi.licenseChanged.connect(lambda : self.licenseInput.setText(self.currentRsi.license))
 
-            copyright = self.currentRsi.copyright()
+            copyright = self.currentRsi.copyright
             self.copyrightInput.setText(copyright)
             self.copyrightInput.setEnabled(True)
-            self.currentRsi.copyrightChanged.connect(lambda : self.copyrightInput.setText(self.currentRsi.copyright()))
+            self.currentRsi.copyrightChanged.connect(lambda : self.copyrightInput.setText(self.currentRsi.copyright))
         else:
             self.sizeInfo.setText('')
             self.licenseInput.setText('')
@@ -279,7 +277,7 @@ class EditorWindow(QtW.QMainWindow):
     def stateListDrillDown(self, stateListIndex):
         state = self.stateList.model().getState(stateListIndex)
         self.currentState = State(self.currentRsi, state.name)
-        self.reloadRsi()
+        self.stateContents.setModel(self.currentState.model)
 
     @QtC.Slot()
     def stateContentsEdit(self, stateIndex):
@@ -292,28 +290,20 @@ class EditorWindow(QtW.QMainWindow):
 
     @QtC.Slot()
     def renameState(self, oldStateName, newStateName):
-        if oldStateName == newStateName:
-            return
-
-        states = self.currentRsi.states()
-
-        if newStateName in states:
-            # TODO: confirm overwrite
-            return
-
-        self.currentRsi.renameState(oldStateName, newStateName)
-        self.reloadRsi()
+        if oldStateName != newStateName:
+            self.undoStack.push(RenameStateCommand(self, oldStateName, newStateName))
+            self.setWindowModified(True)
 
     @QtC.Slot()
     def updateLicense(self):
-        if self.licenseInput.text() != self.currentRsi.license():
-            self.undoStack.push(SetLicenseCommand(self, self.currentRsi.license(), self.licenseInput.text()))
+        if self.licenseInput.text() != self.currentRsi.license:
+            self.undoStack.push(SetLicenseCommand(self, self.currentRsi.license, self.licenseInput.text()))
             self.setWindowModified(True)
 
     @QtC.Slot()
     def updateCopyright(self):
-        if self.copyrightInput.text() != self.currentRsi.copyright():
-            self.undoStack.push(SetCopyrightCommand(self, self.currentRsi.copyright(), self.copyrightInput.text()))
+        if self.copyrightInput.text() != self.currentRsi.copyright:
+            self.undoStack.push(SetCopyrightCommand(self, self.currentRsi.copyright, self.copyrightInput.text()))
             self.setWindowModified(True)
 
 ##############################
@@ -374,6 +364,56 @@ class SetCopyrightCommand(QtW.QUndoCommand):
 
     def undo(self):
         self.editor.currentRsi.setCopyright(self.oldCopyright)
+
+class NewStateCommand(QtW.QUndoCommand):
+    def __init__(self, editor):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+
+        states = self.editor.currentRsi.states
+
+        newStateNumber = 1
+        while f'NewState{newStateNumber}' in states:
+            newStateNumber = newStateNumber + 1
+
+        self.newStateName = f'NewState{newStateNumber}'
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Create new state'
+
+    def redo(self): 
+        self.editor.currentRsi.addState(self.newStateName)
+
+    def undo(self):
+        self.editor.currentRsi.removeState(self.newStateName)
+
+class RenameStateCommand(QtW.QUndoCommand):
+    def __init__(self, editor, oldStateName, newStateName):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.oldStateName = oldStateName
+        self.newStateName = newStateName
+        self.overwritten = None
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Rename state'
+
+    def redo(self):
+        self.overwritten = self.editor.currentRsi.removeState(self.newStateName)
+        self.editor.currentRsi.renameState(self.oldStateName, self.newStateName)
+
+    def undo(self):
+        self.editor.currentRsi.renameState(self.newStateName, self.oldStateName)
+        if self.overwritten != None:
+            self.editor.currentRsi.addState(self.newStateName, self.overwritten)
 
 def editor():
     app = QtW.QApplication([])

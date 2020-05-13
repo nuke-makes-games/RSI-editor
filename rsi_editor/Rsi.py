@@ -4,91 +4,145 @@ import PySide2.QtGui as QtG
 import PIL as PIL
 import PIL.ImageQt as PILQt
 
-import rsi
+import rsi as RSIPy
+
+from collections import OrderedDict
 
 # TODO: Have this be configured by zooming in and out
 iconSize = QtC.QSize(100, 100)
 
+# Custom view/model role - for getting and setting PIL Images
+ImageRole = QtC.Qt.UserRole
+
 # Wrapper class around the RSI API, for use in the editor
-class Rsi(QtC.QObject):
+class Rsi(QtC.QAbstractListModel):
+    stateRenamed = QtC.Signal(str, str)
+
     licenseChanged = QtC.Signal()
     copyrightChanged = QtC.Signal()
 
     # Constructors
-    def __init__(self, rsi):
-        QtC.QObject.__init__(self)
-        self.rsi = rsi
-        self.stateList = StateListModel(self)
+    def __init__(self, rsi, parent=None):
+        QtC.QAbstractListModel.__init__(self, parent)
+        self.states = OrderedDict(rsi.states.items())
+        self.size = rsi.size
+        self.license = rsi.license
+        self.copyright = rsi.copyright
 
     def fromFile(rsiPath):
-        return Rsi(rsi.Rsi.open(rsiPath))
+        return Rsi(RSIPy.Rsi.open(rsiPath))
 
     def fromDmi(dmiPath):
-        return Rsi(rsi.Rsi.from_dmi(dmiPath))
+        return Rsi(RSIPy.Rsi.from_dmi(dmiPath))
 
     def new(x, y):
-        return Rsi(rsi.Rsi((x, y)))
+        return Rsi(RSIPy.Rsi((x, y)))
 
     # Convenience function
 
     def save(self, path):
-        self.rsi.write(path)
+        rsi = RSIPy.Rsi(self.size)
+        rsi.states = self.states
+        rsi.license = self.license
+        rsi.copyright = self.copyright
+        rsi.write(path)
         return True
-
-    # Getters
-
-    def states(self):
-        return self.rsi.states
-
-    def size(self):
-        return self.rsi.size
-
-    def license(self):
-        return self.rsi.license or ''
-
-    def copyright(self):
-        return self.rsi.copyright or ''
 
     # Setters - return True if the RSI is changed
 
     def setLicense(self, licenseText):
-        if self.rsi.license != licenseText:
-            self.rsi.license = licenseText
+        if self.license != licenseText:
+            self.license = licenseText
             self.licenseChanged.emit()
             return True
         return False
 
     def setCopyright(self, copyrightText):
-        if self.rsi.copyright != copyrightText:
-            self.rsi.copyright = copyrightText
+        if self.copyright != copyrightText:
+            self.copyright = copyrightText
             self.copyrightChanged.emit()
             return True
         return False
 
+    def addState(self, stateName):
+        if stateName in self.states:
+            return False
+
+        state = RSIPy.State(stateName, self.size, 1)
+
+        currentFinalRow = self.rowCount(QtC.QModelIndex())
+
+        self.beginInsertRows(QtC.QModelIndex(), currentFinalRow, currentFinalRow)
+        self.states[stateName] = state
+        self.endInsertRows()
+
+        return True
+
+    def addState(self, stateName, state):
+        if not stateName in self.states:
+            currentFinalRow = self.rowCount(QtC.QModelIndex())
+
+            self.beginInsertRows(QtC.QModelIndex(), currentFinalRow, currentFinalRow)
+            self.states[stateName] = state
+            self.endInsertRows()
+        else:
+            self.states[stateName] = state
+            currentIndex = self.getStateIndex(stateName)
+            self.dataChanged.emit(currentIndex, currentIndex)
+        return True
+
+    def removeState(self, stateName):
+        if not stateName in self.states:
+            return None
+
+        currentRow = self.getStateIndex(stateName).row()
+
+        self.beginRemoveRows(QtC.QModelIndex(), currentRow, currentRow)
+        state = self.states.pop(stateName)
+        self.endRemoveRows()
+
+        return state
+
     def renameState(self, oldStateName, newStateName):
+        if not oldStateName in self.states:
+            return False
+
         if oldStateName != newStateName:
-            state = self.rsi.get_state(oldStateName)
-            self.rsi.states.pop(oldStateName)
+            newRow = self.rowCount(QtC.QModelIndex()) - 1
+            currentRow = self.getStateIndex(oldStateName).row()
+
+            # If not the case, the row won't move, and endMoveRows() will actually
+            # segfault
+            if currentRow != newRow:
+                self.beginMoveRows(QtC.QModelIndex(), currentRow, currentRow, QtC.QModelIndex(), newRow)
+
+            state = self.states[oldStateName]
+            self.states.pop(oldStateName)
             state.name = newStateName
-            self.rsi.set_state(state, newStateName)
+            self.states[newStateName] = state
+
+            if currentRow != newRow:
+                self.endMoveRows()
+            else:
+                newIndex = self.getStateIndex(newStateName)
+                self.dataChanged.emit(newIndex, newIndex)
+            
             return True
         return False
 
-# Custom view/model role - for getting and setting PIL Images
-ImageRole = QtC.Qt.UserRole
-
-class StateListModel(QtC.QAbstractListModel):
-    def __init__(self, rsi, parent = None):
-        QtC.QAbstractListModel.__init__(self, parent)
-
-        self.size = rsi.size()
-        self.states = list(rsi.states().values())
+    # Model methods
 
     def rowCount(self, _parent):
         return len(self.states)
 
     def getState(self, index):
-        return self.states[index.row()]
+        return list(self.states.values())[index.row()]
+
+    def getStateIndex(self, stateName):
+        for index, name in enumerate(self.states.keys()):
+            if name == stateName:
+                return self.createIndex(index, 0)
+        return QtC.QModelIndex()
 
     def data(self, index, role=QtC.Qt.DisplayRole):
         state = self.getState(index)
@@ -108,26 +162,29 @@ class StateListModel(QtC.QAbstractListModel):
 
             return stateIcon
 
-    def lags(self, _index):
+    def flags(self, _index):
         # All states have the same flags
         return QtC.Qt.ItemIsSelectable | QtC.Qt.ItemIsEditable | QtC.Qt.ItemIsEnabled | QtC.Qt.ItemNeverHasChildren
 
+    # setData is intercepted to produce something on the undo stack and also
+    # fix other data
     def setData(self, index, value, role=QtC.Qt.EditRole):
-        state = self.getState(index)
+        if role == QtC.Qt.EditRole:
+            state = self.getState(index)
 
-        if not isinstance(value, str):
-            return False
+            if not isinstance(value, str):
+                return False
 
-        state.name = value
-        self.dataChanged.emit(index, index)
-        return True
+            self.stateRenamed.emit(self.data(index, role=role), value)
+            return True
+        return False
 
     # No header data right now
 
 # Wrapper class around an RSI state, for use in the editor
 class State():
     def __init__(self, parentRsi, stateName):
-        self.state = parentRsi.states()[stateName]
+        self.state = parentRsi.states[stateName]
         self.model = StateModel(self)
 
     # Getters
