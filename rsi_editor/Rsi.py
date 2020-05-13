@@ -10,9 +10,13 @@ import rsi
 iconSize = QtC.QSize(100, 100)
 
 # Wrapper class around the RSI API, for use in the editor
-class Rsi():
+class Rsi(QtC.QObject):
+    licenseChanged = QtC.Signal()
+    copyrightChanged = QtC.Signal()
+
     # Constructors
     def __init__(self, rsi):
+        QtC.QObject.__init__(self)
         self.rsi = rsi
         self.stateList = StateListModel(self)
 
@@ -50,12 +54,14 @@ class Rsi():
     def setLicense(self, licenseText):
         if self.rsi.license != licenseText:
             self.rsi.license = licenseText
+            self.licenseChanged.emit()
             return True
         return False
 
     def setCopyright(self, copyrightText):
         if self.rsi.copyright != copyrightText:
             self.rsi.copyright = copyrightText
+            self.copyrightChanged.emit()
             return True
         return False
 

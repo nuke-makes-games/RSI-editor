@@ -71,6 +71,14 @@ class EditorWindow(QtW.QMainWindow):
         redoAction.setShortcut(QtG.QKeySequence.Redo)
         redoAction.triggered.connect(self.undoStack.redo)
 
+        # Undo history
+        undoMenu = editMenu.addMenu("Undo history")
+
+        undoHistory = QtW.QUndoView(parent=undoMenu)
+        undoHistory.setStack(self.undoStack)
+
+        undoMenu.addAction(QtW.QWidgetAction(undoHistory))
+
     def contentMenus(self):
         self.stateContentsMenu()
 
@@ -156,10 +164,12 @@ class EditorWindow(QtW.QMainWindow):
             license = self.currentRsi.license()
             self.licenseInput.setText(license)
             self.licenseInput.setEnabled(True)
+            self.currentRsi.licenseChanged.connect(lambda : self.licenseInput.setText(self.currentRsi.license()))
 
             copyright = self.currentRsi.copyright()
             self.copyrightInput.setText(copyright)
             self.copyrightInput.setEnabled(True)
+            self.currentRsi.copyrightChanged.connect(lambda : self.copyrightInput.setText(self.currentRsi.copyright()))
         else:
             self.sizeInfo.setText('')
             self.licenseInput.setText('')
@@ -175,7 +185,7 @@ class EditorWindow(QtW.QMainWindow):
 
         # TODO: get RSI size values in input
         self.currentRsi = Rsi.new(32, 32)
-        self.setWindowPath('')
+        self.setWindowFilePath('')
         self.setWindowModified(False)
         self.reloadRsi()
 
@@ -297,14 +307,73 @@ class EditorWindow(QtW.QMainWindow):
     @QtC.Slot()
     def updateLicense(self):
         if self.licenseInput.text() != self.currentRsi.license():
-            self.currentRsi.setLicense(self.licenseInput.text())
+            self.undoStack.push(SetLicenseCommand(self, self.currentRsi.license(), self.licenseInput.text()))
             self.setWindowModified(True)
 
     @QtC.Slot()
     def updateCopyright(self):
         if self.copyrightInput.text() != self.currentRsi.copyright():
-            self.currentRsi.setCopyright(self.copyrightInput.text())
+            self.undoStack.push(SetCopyrightCommand(self, self.currentRsi.copyright(), self.copyrightInput.text()))
             self.setWindowModified(True)
+
+##############################
+### COMMANDS FOR UNDO/REDO ###
+#############################
+
+SetLicenseCommandId = 100
+SetCopyrightCommandId = 101
+
+class SetLicenseCommand(QtW.QUndoCommand):
+    def __init__(self, editor, oldLicense, newLicense):
+        QtW.QUndoCommand.__init__(self)
+        self.editor = editor
+        self.oldLicense = oldLicense
+        self.newLicense = newLicense
+
+    def id(self):
+        return SetLicenseCommandId
+
+    def text(self):
+        return 'Edit license'
+
+    def mergeWith(self, other):
+        if other.id() != self.id():
+            return False
+
+        self.newLicense = other.newLicense
+        return True
+
+    def redo(self):
+        self.editor.currentRsi.setLicense(self.newLicense)
+
+    def undo(self):
+        self.editor.currentRsi.setLicense(self.oldLicense)
+
+class SetCopyrightCommand(QtW.QUndoCommand):
+    def __init__(self, editor, oldCopyright, newCopyright):
+        QtW.QUndoCommand.__init__(self)
+        self.editor = editor
+        self.oldCopyright = oldCopyright
+        self.newCopyright = newCopyright
+
+    def id(self):
+        return SetCopyrightCommandId
+
+    def text(self):
+        return 'Edit copyright'
+
+    def mergeWith(self, other):
+        if other.id() != self.id():
+            return False
+
+        self.newCopyright = other.newCopyright
+        return True
+
+    def redo(self):
+        self.editor.currentRsi.setCopyright(self.newCopyright)
+
+    def undo(self):
+        self.editor.currentRsi.setCopyright(self.oldCopyright)
 
 def editor():
     app = QtW.QApplication([])
