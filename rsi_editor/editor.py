@@ -4,7 +4,7 @@ import PySide2.QtWidgets as QtW
 
 from .ImageEditor import ImageEditor
 from .Rsi import Rsi, State, iconSize
-from .AnimationView import AnimationView 
+from .AnimationView import AnimationView, CellAction 
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 dmiFileFilter = 'DreamMaker Image (*.dmi)'
@@ -79,8 +79,14 @@ class EditorWindow(QtW.QMainWindow):
 
         undoMenu.addAction(QtW.QWidgetAction(undoHistory))
 
+        editMenu.addSeparator()
+
+        newStateAction = editMenu.addAction("Add new state")
+        newStateAction.triggered.connect(lambda: self.undoStack.push(NewStateCommand(self)))
+
     def contentMenus(self):
         self.stateContentsMenu()
+        self.stateListMenu()
 
     def stateContentsMenu(self):
         editorAction = self.stateContents.addCellAction("Open in editor...")
@@ -99,6 +105,16 @@ class EditorWindow(QtW.QMainWindow):
         #deleteFrameAction = self.stateContents.addCellAction("Delete frame")
         #deleteFrameAction.indexTriggered.connect(self.stateContentsDeleteFrame)
 
+    def stateListMenu(self):
+        # Action stuff
+        def addItemAction(actionText):
+            action = CellAction(actionText, self.stateList)
+            self.stateList.addAction(action)
+            return action
+
+        deleteStateAction = addItemAction("Delete state")
+        deleteStateAction.indexTriggered.connect(lambda index: self.deleteState(self.stateList.model().data(index)))
+
     def contentLayout(self):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
@@ -114,6 +130,7 @@ class EditorWindow(QtW.QMainWindow):
         self.stateList.setUniformItemSizes(True)
         self.stateList.setWordWrap(True)
         self.stateList.setSelectionMode(QtW.QAbstractItemView.ExtendedSelection)
+        self.stateList.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
         self.stateList.clicked.connect(self.stateListDrillDown)
 
         stateLayout = QtW.QHBoxLayout()
@@ -287,11 +304,16 @@ class EditorWindow(QtW.QMainWindow):
         if edited is not None:
             self.stateContents.model().setFrame(stateIndex, edited)
 
-
     @QtC.Slot()
     def renameState(self, oldStateName, newStateName):
         if oldStateName != newStateName:
             self.undoStack.push(RenameStateCommand(self, oldStateName, newStateName))
+            self.setWindowModified(True)
+
+    @QtC.Slot()
+    def deleteState(self, stateName):
+        if stateName in self.currentRsi.states:
+            self.undoStack.push(DeleteStateCommand(self, stateName))
             self.setWindowModified(True)
 
     @QtC.Slot()
@@ -390,6 +412,28 @@ class NewStateCommand(QtW.QUndoCommand):
 
     def undo(self):
         self.editor.currentRsi.removeState(self.newStateName)
+
+class DeleteStateCommand(QtW.QUndoCommand):
+    def __init__(self, editor, stateName):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.stateName = stateName
+
+        # Deliberately don't define this, because redo() is always called first!
+        # self.deleted = None
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Delete state'
+
+    def redo(self):
+        self.deleted = self.editor.currentRsi.removeState(self.stateName)
+
+    def undo(self):
+        self.editor.currentRsi.addState(self.stateName, self.deleted)
 
 class RenameStateCommand(QtW.QUndoCommand):
     def __init__(self, editor, oldStateName, newStateName):

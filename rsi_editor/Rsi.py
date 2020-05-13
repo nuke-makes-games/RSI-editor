@@ -64,32 +64,32 @@ class Rsi(QtC.QAbstractListModel):
             return True
         return False
 
-    def addState(self, stateName):
-        if stateName in self.states:
-            return False
+    def addState(self, stateName, state=None):
+        if state != None:
+            if not stateName in self.states:
+                currentFinalRow = self.rowCount(QtC.QModelIndex())
 
-        state = RSIPy.State(stateName, self.size, 1)
+                self.beginInsertRows(QtC.QModelIndex(), currentFinalRow, currentFinalRow)
+                self.states[stateName] = state
+                self.endInsertRows()
+            else:
+                self.states[stateName] = state
+                currentIndex = self.getStateIndex(stateName)
+                self.dataChanged.emit(currentIndex, currentIndex)
+            return True
+        else:
+            if stateName in self.states:
+                return False
 
-        currentFinalRow = self.rowCount(QtC.QModelIndex())
+            state = RSIPy.State(stateName, [], self.size, 1)
 
-        self.beginInsertRows(QtC.QModelIndex(), currentFinalRow, currentFinalRow)
-        self.states[stateName] = state
-        self.endInsertRows()
-
-        return True
-
-    def addState(self, stateName, state):
-        if not stateName in self.states:
             currentFinalRow = self.rowCount(QtC.QModelIndex())
 
             self.beginInsertRows(QtC.QModelIndex(), currentFinalRow, currentFinalRow)
             self.states[stateName] = state
             self.endInsertRows()
-        else:
-            self.states[stateName] = state
-            currentIndex = self.getStateIndex(stateName)
-            self.dataChanged.emit(currentIndex, currentIndex)
-        return True
+
+            return True
 
     def removeState(self, stateName):
         if not stateName in self.states:
