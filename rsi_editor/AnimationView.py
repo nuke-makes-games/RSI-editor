@@ -2,10 +2,13 @@ import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
+from .ItemAction import ItemAction
 from .Rsi import ImageRole
 
 # Like a table, but does animation summaries
 class AnimationView(QtW.QWidget):
+    modelChanged = QtC.Signal()
+
     def __init__(self, parent=None):
         QtW.QWidget.__init__(self, parent)
 
@@ -15,7 +18,6 @@ class AnimationView(QtW.QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
-
         self.table.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
 
         layout = QtW.QHBoxLayout()
@@ -28,6 +30,10 @@ class AnimationView(QtW.QWidget):
     def setModel(self, model):
         animationModel = AnimationModel(model)
         self.table.setModel(animationModel)
+        self.modelChanged.emit()
+
+    def selectionModel(self):
+        return self.table.selectionModel()
 
     def reset(self):
         self.table.reset()
@@ -35,18 +41,13 @@ class AnimationView(QtW.QWidget):
     def setIconSize(self, size):
         self.table.setIconSize(size)
 
-    def addCellAction(self, actionText):
-        action = CellAction(actionText, self.table)
+    def currentIndex(self):
+        return self.table.currentIndex()
+
+    def addItemAction(self, actionText):
+        action = ItemAction(actionText, self)
         self.table.addAction(action)
         return action
-
-class CellAction(QtW.QAction):
-    indexTriggered = QtC.Signal(QtC.QModelIndex)
-
-    def __init__(self, text, table):
-        QtW.QAction.__init__(self, text, parent=table)
-        self.table = table
-        self.triggered.connect(lambda _checked: self.indexTriggered.emit(self.table.currentIndex()))
 
 # Wrapper model which also exposes animation summaries
 class AnimationModel(QtC.QAbstractItemModel):

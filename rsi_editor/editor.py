@@ -3,8 +3,10 @@ import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
 from .ImageEditor import ImageEditor
+from .ItemAction import ItemAction
 from .Rsi import Rsi, State, iconSize
-from .AnimationView import AnimationView, CellAction 
+from .AnimationView import AnimationView
+from .ListView import ListView
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 dmiFileFilter = 'DreamMaker Image (*.dmi)'
@@ -89,7 +91,9 @@ class EditorWindow(QtW.QMainWindow):
         self.stateListMenu()
 
     def stateContentsMenu(self):
-        editorAction = self.stateContents.addCellAction("Open in editor...")
+        editorAction = self.stateContents.addItemAction("Open in editor...")
+        # Can only edit frames which exist
+        editorAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None)
         editorAction.indexTriggered.connect(self.stateContentsEdit)
 
         # TODO: important actions
@@ -108,7 +112,7 @@ class EditorWindow(QtW.QMainWindow):
     def stateListMenu(self):
         # Action stuff
         def addItemAction(actionText):
-            action = CellAction(actionText, self.stateList)
+            action = ItemAction(actionText, self.stateList)
             self.stateList.addAction(action)
             return action
 
@@ -122,7 +126,7 @@ class EditorWindow(QtW.QMainWindow):
         self.stateContents = AnimationView()
         self.stateContents.setIconSize(iconSize)
 
-        self.stateList = QtW.QListView()
+        self.stateList = ListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
         self.stateList.setIconSize(iconSize)
         self.stateList.setMovement(QtW.QListView.Snap)
