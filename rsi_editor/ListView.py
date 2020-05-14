@@ -1,0 +1,22 @@
+import PySide2.QtCore as QtC
+import PySide2.QtGui as QtG
+import PySide2.QtWidgets as QtW
+
+from .ItemAction import ItemAction
+
+# Convenience wrapper for QtW.QListView, adding some necessary signals
+# and convenient methods
+class ListView(QtW.QListView):
+    modelChanged = QtC.Signal()
+
+    def __init__(self, parent=None):
+        QtW.QListView.__init__(self, parent=parent)
+
+    def setModel(self, model):
+        QtW.QListView.setModel(self, model)
+        self.modelChanged.emit()
+
+    def addItemAction(self, actionText):
+        action = ItemAction(actionText, self)
+        self.addAction(action)
+        return action
