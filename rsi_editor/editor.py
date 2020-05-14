@@ -97,17 +97,14 @@ class EditorWindow(QtW.QMainWindow):
         editorAction.indexTriggered.connect(self.stateContentsEdit)
 
         # TODO: important actions
-        #insertAction = self.stateContents.addCellAction("Insert image")
-        #insertAction.indexTriggered.connect(self.stateContentsInsert)
 
-        #insertFrameAction = self.stateContents.addCellAction("Insert frame")
-        #insertFrameAction.indexTriggered.connect(self.stateContentsInsertFrame)
+        insertFrameAction = self.stateContents.addItemAction("Add frame")
+        #insertFrameAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None)
+        insertFrameAction.indexTriggered.connect(self.stateContentsAddFrame)
 
-        #deleteAction = self.stateContents.addCellAction("Delete image")
-        #deleteAction.indexTriggered.connect(self.stateContentsDelete)
-
-        #deleteFrameAction = self.stateContents.addCellAction("Delete frame")
-        #deleteFrameAction.indexTriggered.connect(self.stateContentsDeleteFrame)
+        deleteFrameAction = self.stateContents.addItemAction("Delete frame")
+        deleteFrameAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None)
+        deleteFrameAction.indexTriggered.connect(self.stateContentsDeleteFrame)
 
     def stateListMenu(self):
         # Action stuff
@@ -123,8 +120,13 @@ class EditorWindow(QtW.QMainWindow):
         splitter = QtW.QSplitter()
         splitter.setOrientation(QtC.Qt.Vertical)
 
-        self.stateContents = AnimationView()
+        self.stateContents = AnimationView(parent=splitter)
         self.stateContents.setIconSize(iconSize)
+
+        stateContentsLayout = QtW.QHBoxLayout()
+        stateContentsLayout.addWidget(self.stateContents)
+        stateContentsWidget = QtW.QWidget()
+        stateContentsWidget.setLayout(stateContentsLayout)
 
         self.stateList = ListView()
         self.stateList.setViewMode(QtW.QListView.IconMode)
@@ -160,7 +162,7 @@ class EditorWindow(QtW.QMainWindow):
         self.configGroupBox = QtW.QGroupBox("Metadata")
         self.configGroupBox.setLayout(configLayout)
 
-        splitter.addWidget(self.stateContents)
+        splitter.addWidget(stateContentsWidget)
         splitter.addWidget(stateWidget)
         splitter.addWidget(self.configGroupBox)
 
@@ -298,7 +300,7 @@ class EditorWindow(QtW.QMainWindow):
     def stateListDrillDown(self, stateListIndex):
         state = self.stateList.model().getState(stateListIndex)
         self.currentState = State(self.currentRsi, state.name)
-        self.stateContents.setModel(self.currentState.model)
+        self.stateContents.setModel(self.currentState)
 
     @QtC.Slot()
     def stateContentsEdit(self, stateIndex):
@@ -307,6 +309,17 @@ class EditorWindow(QtW.QMainWindow):
 
         if edited is not None:
             self.stateContents.model().setFrame(stateIndex, edited)
+            self.setWindowModified(True)
+
+    @QtC.Slot()
+    def stateContentsAddFrame(self, stateIndex):
+        self.undoStack.push(NewFrameCommand(self, stateIndex))
+        self.setWindowModified(True)
+
+    @QtC.Slot()
+    def stateContentsDeleteFrame(self, stateIndex):
+        self.undoStack.push(DeleteFrameCommand(self, stateIndex))
+        self.setWindowModified(True)
 
     @QtC.Slot()
     def renameState(self, oldStateName, newStateName):
@@ -425,7 +438,7 @@ class DeleteStateCommand(QtW.QUndoCommand):
         self.stateName = stateName
 
         # Deliberately don't define this, because redo() is always called first!
-        # self.deleted = None
+        self.deleted = None
 
     def id(self):
         return -1
@@ -462,6 +475,47 @@ class RenameStateCommand(QtW.QUndoCommand):
         self.editor.currentRsi.renameState(self.newStateName, self.oldStateName)
         if self.overwritten != None:
             self.editor.currentRsi.addState(self.newStateName, self.overwritten)
+
+class NewFrameCommand(QtW.QUndoCommand):
+    def __init__(self, editor, frameIndex):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.frameIndex = frameIndex
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Add frame'
+
+    def redo(self):
+        self.editor.currentState.addFrame(self.frameIndex)
+
+    def undo(self):
+        self.editor.currentState.deleteFrame(self.frameIndex)
+
+class DeleteFrameCommand(QtW.QUndoCommand):
+    def __init__(self, editor, frameIndex):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.frameIndex = frameIndex
+
+        # Deliberately don't define this, because redo() is always called first!
+        self.deleted = None
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Delete frame'
+
+    def redo(self):
+        self.deleted = self.editor.currentState.deleteFrame(self.frameIndex)
+
+    def undo(self):
+        self.editor.currentState.addFrame(self.frameIndex, self.deleted[0], self.deleted[1])
 
 def editor():
     app = QtW.QApplication([])

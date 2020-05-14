@@ -6,47 +6,27 @@ from .ItemAction import ItemAction
 from .Rsi import ImageRole
 
 # Like a table, but does animation summaries
-class AnimationView(QtW.QWidget):
+class AnimationView(QtW.QTableView):
     modelChanged = QtC.Signal()
 
     def __init__(self, parent=None):
-        QtW.QWidget.__init__(self, parent)
+        QtW.QTableView.__init__(self, parent)
 
-        self.table = QtW.QTableView(parent=self)
-        self.table.setSortingEnabled(False)
-        self.table.setGridStyle(QtC.Qt.NoPen)
-        self.table.horizontalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setStretchLastSection(True)
-        self.table.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
-        self.table.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
-
-        layout = QtW.QHBoxLayout()
-        layout.addWidget(self.table)
-        self.setLayout(layout)
-
-    def model(self):
-        return self.table.model()
+        self.setSortingEnabled(False)
+        self.setGridStyle(QtC.Qt.NoPen)
+        self.horizontalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
+        self.horizontalHeader().setStretchLastSection(True)
+        self.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
+        self.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
 
     def setModel(self, model):
         animationModel = AnimationModel(model)
-        self.table.setModel(animationModel)
+        QtW.QTableView.setModel(self, animationModel)
         self.modelChanged.emit()
-
-    def selectionModel(self):
-        return self.table.selectionModel()
-
-    def reset(self):
-        self.table.reset()
-
-    def setIconSize(self, size):
-        self.table.setIconSize(size)
-
-    def currentIndex(self):
-        return self.table.currentIndex()
 
     def addItemAction(self, actionText):
         action = ItemAction(actionText, self)
-        self.table.addAction(action)
+        self.addAction(action)
         return action
 
 # Wrapper model which also exposes animation summaries
@@ -58,6 +38,25 @@ class AnimationModel(QtC.QAbstractItemModel):
         self.animations = []
         self.recalculateSummary()
         self.innerModel.dataChanged.connect(self.innerModelDataChanged)
+
+        self.innerModel.dataChanged.connect(self.dataChanged.emit)
+        self.innerModel.headerDataChanged.connect(self.headerDataChanged.emit)
+        self.innerModel.layoutAboutToBeChanged.connect(self.layoutAboutToBeChanged.emit)
+        self.innerModel.layoutChanged.connect(self.layoutChanged.emit)
+
+        self.innerModel.rowsAboutToBeInserted.connect(self.beginInsertRows)
+        self.innerModel.rowsInserted.connect(self.endInsertRows)
+        self.innerModel.rowsAboutToBeMoved.connect(self.beginMoveRows)
+        self.innerModel.rowsMoved.connect(self.endMoveRows)
+        self.innerModel.rowsAboutToBeRemoved.connect(self.beginRemoveRows)
+        self.innerModel.rowsRemoved.connect(self.endRemoveRows)
+
+        self.innerModel.columnsAboutToBeInserted.connect(self.beginInsertColumns)
+        self.innerModel.columnsInserted.connect(self.endInsertColumns)
+        self.innerModel.columnsAboutToBeMoved.connect(self.beginMoveColumns)
+        self.innerModel.columnsMoved.connect(self.endMoveColumns)
+        self.innerModel.columnsAboutToBeRemoved.connect(self.beginRemoveColumns)
+        self.innerModel.columnsRemoved.connect(self.endRemoveColumns)
 
     def innerModelDataChanged(self, topLeft, bottomRight, roles=list()):
         # Some data has changed - so we need to regenerate the

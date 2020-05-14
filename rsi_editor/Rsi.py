@@ -182,10 +182,11 @@ class Rsi(QtC.QAbstractListModel):
     # No header data right now
 
 # Wrapper class around an RSI state, for use in the editor
-class State():
-    def __init__(self, parentRsi, stateName):
+class State(QtC.QAbstractTableModel):
+    def __init__(self, parentRsi, stateName, parent = None):
+        QtC.QAbstractTableModel.__init__(self, parent)
+
         self.state = parentRsi.states[stateName]
-        self.model = StateModel(self)
 
     # Getters
 
@@ -216,35 +217,85 @@ class State():
     def setImage(self, direction, frame, image):
         self.state.icons[direction][frame] = image.copy()
 
-class StateModel(QtC.QAbstractTableModel):
-    def __init__(self, state, parent = None):
-        QtC.QAbstractTableModel.__init__(self, parent)
+    def getDirFrame(self, index):
+        framesInDirection = self.frames(index.row())
+        if index.column() >= len(framesInDirection):
+            return None
+        return (index.row(), index.column())
 
-        self.state = state
+    # Frame manipulations
+
+    def addFrame(self, index, image = None, delay = 0.0):
+        if image is None:
+            image = PIL.Image.new('RGB', self.state.size)
+
+        columnEnd = self.columnCount(QtC.QModelIndex())
+        # In this case, we're going to insert a column
+        insertColumn =  len(self.state.icons[index.row()]) == columnEnd
+
+        if insertColumn:
+            print(f"Starting insert at {columnEnd}")
+            self.beginInsertColumns(QtC.QModelIndex(), columnEnd, columnEnd)
+
+        self.state.icons[index.row()].insert(index.column(), image)
+        self.state.delays[index.row()].insert(index.column(), delay)
+
+        if insertColumn:
+            self.endInsertColumns()
+        
+        self.dataChanged.emit(index, index.siblingAtColumn(self.columnCount(QtC.QModelIndex()) - 1))
+
+    def deleteFrame(self, index):
+        removeColumn = True
+        columnCount = self.columnCount(QtC.QModelIndex())
+        for direction in range(self.directions()):
+            if direction == index.row():
+                continue
+
+            # Remove the column if all other directions *DON'T* have a frame in it
+            removeColumn = removeColumn and (len(self.state.icons[direction]) != columnCount)
+
+        # If this is the case, removing this frame should delete the final column
+        if removeColumn:
+            print(f"Starting removal at {columnCount - 1}")
+            self.beginRemoveColumns(QtC.QModelIndex(), columnCount - 1, columnCount - 1)
+
+        image = self.state.icons[direction].pop(index.column())
+        delay = self.state.delays[direction].pop(index.column())
+
+        if removeColumn:
+            self.endRemoveColumns()
+
+        newColumnCount = self.columnCount(QtC.QModelIndex())
+        if index.column() >= newColumnCount:
+            self.dataChanged.emit(index, index.siblingAtColumn(newColumnCount - 1))
+
+        return (image, delay) 
+
+    # Model functions
 
     def rowCount(self, _parent):
-        return self.state.directions()
+        return self.directions()
 
     def columnCount(self, _parent):
         longestDirection = 0
 
-        for i in range(self.state.directions()):
-            longestDirection = max(longestDirection, len(self.state.frames(i)))
+        for i in range(self.directions()):
+            longestDirection = max(longestDirection, len(self.state.icons[i]))
 
         return longestDirection
 
-    def getDirFrame(self, index):
-        framesInDirection = self.state.frames(index.row())
-        if index.column() >= len(framesInDirection):
-            return None
-        return (index.row(), index.column())
+    def index(self, row, column, parent=QtC.QModelIndex()):
+        if column < self.columnCount(parent) and row < self.rowCount(parent):
+            return self.createIndex(row, column)
+        return QtC.QModelIndex()
 
     def data(self, index, role=QtC.Qt.DisplayRole):
         dirFrame = self.getDirFrame(index)
 
         if dirFrame is not None:
             (direction, frame) = dirFrame
-            frameInfo = self.state.frames(direction)[frame]
+            frameInfo = self.frames(direction)[frame]
 
             if role == QtC.Qt.DisplayRole or role == QtC.Qt.EditRole:
                 return frameInfo[1] # The delay
@@ -288,6 +339,9 @@ class StateModel(QtC.QAbstractTableModel):
                         return 'North West'
                 return None
         else:
+            if section > self.columnCount(QtC.QModelIndex()):
+                return None
+
             if role == QtC.Qt.DisplayRole:
                 return f'Frame {section + 1}'
             return None
@@ -312,13 +366,13 @@ class StateModel(QtC.QAbstractTableModel):
                 except ValueError:
                     return False
 
-            if self.state.setDelay(direction, frame, value):
+            if self.setDelay(direction, frame, value):
                 self.dataChanged.emit(index, index)
                 return True
             return False
 
         if role == ImageRole:
-            self.state.setImage(direction, frame, value)
+            self.setImage(direction, frame, value)
             self.dataChanged.emit(index, index)
             return True
 
