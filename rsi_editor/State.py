@@ -66,7 +66,7 @@ class State(QtC.QAbstractTableModel):
 
     def addFrame(self, index, image = None, delay = 0.0):
         if image is None:
-            image = PIL.Image.new('RGB', self.state.size)
+            image = PIL.Image.new('RGBA', self.state.size)
 
         columnEnd = self.columnCount(QtC.QModelIndex()) - 1
         # In this case, we're going to insert a column
@@ -150,6 +150,9 @@ class State(QtC.QAbstractTableModel):
                 if role == QtC.Qt.DecorationRole:
                     currentFrame = self.animations[index.row()].currentAnimation()
                     # Some directions may have no animation
+                    # and while the animation *should* never refer to the summary column
+                    # it might do if data is fetched between the column being removed
+                    # and the new animation being created
                     if currentFrame is not None and currentFrame.index.column() != self.summaryColumn():
                         return self.data(currentFrame.index, role)
                 if role == QtC.Qt.DisplayRole:

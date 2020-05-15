@@ -15,7 +15,7 @@ class AnimationView(QtW.QTableView):
         self.setSortingEnabled(False)
         self.setGridStyle(QtC.Qt.NoPen)
         self.horizontalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
-        self.horizontalHeader().setStretchLastSection(True)
+        #self.horizontalHeader().setStretchLastSection(True)
         self.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
         self.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
 

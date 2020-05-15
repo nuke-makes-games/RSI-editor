@@ -149,7 +149,7 @@ class Rsi(QtC.QAbstractListModel):
         if role == QtC.Qt.DecorationRole:
 
             if len(state.icons[0]) == 0:
-                image = PIL.Image.new('RGB', self.size)
+                image = PIL.Image.new('RGBA', self.size)
             else:
                 image = state.icons[0][0]
 
