@@ -4,7 +4,8 @@ import PySide2.QtWidgets as QtW
 
 from .ImageEditor import ImageEditor
 from .ItemAction import ItemAction
-from .Rsi import Rsi, State, iconSize
+from .Rsi import Rsi, iconSize
+from .State import State
 from .AnimationView import AnimationView
 from .ListView import ListView
 
