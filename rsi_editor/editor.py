@@ -171,10 +171,6 @@ class EditorWindow(QtW.QMainWindow):
         self.setCentralWidget(splitter)
 
     def reloadRsi(self):
-        # Clear the grid
-        self.stateContents.reset()
-        self.stateList.reset()
-
         if self.currentRsi is not None:
             self.stateList.setModel(self.currentRsi)
 
@@ -193,6 +189,9 @@ class EditorWindow(QtW.QMainWindow):
             self.copyrightInput.setEnabled(True)
             self.currentRsi.copyrightChanged.connect(lambda : self.copyrightInput.setText(self.currentRsi.copyright))
         else:
+            self.stateContents.setModel(None)
+            self.stateList.setModel(None)
+
             self.sizeInfo.setText('')
             self.licenseInput.setText('')
             self.licenseInput.setEnabled(False)
@@ -294,6 +293,7 @@ class EditorWindow(QtW.QMainWindow):
         if response:
             self.currentRsi = None
             self.currentState = None
+            self.reloadRsi()
 
         return response
 
