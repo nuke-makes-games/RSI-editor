@@ -39,11 +39,13 @@ class EditorWindow(QtW.QMainWindow):
 
         # Set up file opening
         openAction = fileMenu.addAction("&Open")
+        openAction.setIcon(QtG.QIcon.fromTheme("document-open", self.style().standardIcon(QtW.QStyle.SP_DialogOpenButton)))
         openAction.setShortcut(QtG.QKeySequence.Open)
         openAction.triggered.connect(self.openRsi)
 
         # Set up file saving
         saveAction = fileMenu.addAction("&Save")
+        saveAction.setIcon(QtG.QIcon.fromTheme("document-save", self.style().standardIcon(QtW.QStyle.SP_DialogSaveButton)))
         saveAction.setShortcut(QtG.QKeySequence.Save)
         saveAction.triggered.connect(self.saveRsi)
 
@@ -66,11 +68,13 @@ class EditorWindow(QtW.QMainWindow):
 
         # Undo
         undoAction = editMenu.addAction("&Undo")
+        undoAction.setIcon(QtG.QIcon.fromTheme("edit-undo", self.style().standardIcon(QtW.QStyle.SP_ArrowLeft)))
         undoAction.setShortcut(QtG.QKeySequence.Undo)
         undoAction.triggered.connect(self.undoStack.undo)
 
         # Redo
         redoAction = editMenu.addAction("&Redo")
+        redoAction.setIcon(QtG.QIcon.fromTheme("edit-redo", self.style().standardIcon(QtW.QStyle.SP_ArrowRight)))
         redoAction.setShortcut(QtG.QKeySequence.Redo)
         redoAction.triggered.connect(self.undoStack.redo)
 
