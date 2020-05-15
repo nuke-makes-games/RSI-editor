@@ -29,6 +29,8 @@ class EditorWindow(QtW.QMainWindow):
 
         self.contentMenus()
 
+        self.reloadRsi()
+
     def editorMenu(self):
         fileMenu = self.menuBar().addMenu("&File")
 
@@ -88,9 +90,6 @@ class EditorWindow(QtW.QMainWindow):
 
         editMenu.addSeparator()
 
-        newStateAction = editMenu.addAction("Add new state")
-        newStateAction.triggered.connect(lambda: self.undoStack.push(NewStateCommand(self)))
-
     def contentMenus(self):
         self.stateContentsMenu()
         self.stateListMenu()
@@ -113,12 +112,12 @@ class EditorWindow(QtW.QMainWindow):
 
     def stateListMenu(self):
         # Action stuff
-        def addItemAction(actionText):
-            action = ItemAction(actionText, self.stateList)
-            self.stateList.addAction(action)
-            return action
 
-        deleteStateAction = addItemAction("Delete state")
+        newStateAction = self.stateList.addItemAction("Add new state")
+        newStateAction.setCheckValid(False)
+        newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self)))
+
+        deleteStateAction = self.stateList.addItemAction("Delete state")
         deleteStateAction.indexTriggered.connect(lambda index: self.deleteState(self.stateList.model().data(index)))
 
     def contentLayout(self):
@@ -177,6 +176,9 @@ class EditorWindow(QtW.QMainWindow):
     def reloadRsi(self):
         if self.currentRsi is not None:
             self.stateList.setModel(self.currentRsi)
+            self.stateList.setEnabled(True)
+
+            self.stateContents.setEnabled(True)
 
             self.currentRsi.stateRenamed.connect(self.renameState)
 
@@ -192,9 +194,13 @@ class EditorWindow(QtW.QMainWindow):
             self.copyrightInput.setText(copyright)
             self.copyrightInput.setEnabled(True)
             self.currentRsi.copyrightChanged.connect(lambda : self.copyrightInput.setText(self.currentRsi.copyright))
+
         else:
             self.stateContents.setModel(None)
+            self.stateContents.setEnabled(False)
+
             self.stateList.setModel(None)
+            self.stateList.setEnabled(False)
 
             self.sizeInfo.setText('')
             self.licenseInput.setText('')

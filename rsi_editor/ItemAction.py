@@ -11,12 +11,18 @@ class ItemAction(QtW.QAction):
         self.view = view
         self.triggered.connect(lambda _checked: self.indexTriggered.emit(self.view.currentIndex()))
 
+        self.checkValid = True
         self.enableCondition = (lambda _index: True)
         self.updateEnabled(self.view.currentIndex())
         self.view.modelChanged.connect(self.connectToCurrent)
 
     def setEnableIf(self, enableCondition):
         self.enableCondition = enableCondition
+        self.updateEnabled(self.view.currentIndex())
+
+    def setCheckValid(self, val):
+        self.checkValid = val
+        self.updateEnabled(self.view.currentIndex())
 
     @QtC.Slot()
     def connectToCurrent(self):
@@ -25,7 +31,7 @@ class ItemAction(QtW.QAction):
 
     @QtC.Slot()
     def updateEnabled(self, newViewIndex):
-        if newViewIndex.isValid() and self.enableCondition(newViewIndex):
+        if (not self.checkValid or newViewIndex.isValid()) and self.enableCondition(newViewIndex):
             self.setEnabled(True)
         else:
             self.setEnabled(False)
