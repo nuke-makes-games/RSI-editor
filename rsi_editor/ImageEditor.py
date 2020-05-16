@@ -3,15 +3,17 @@
 # Because RSI-editor is *not* an image editor, it delegates editing to a third
 # party program
 
-import PIL
+import PIL # type: ignore
 
 import os
 import subprocess
 import tempfile
 
+from typing import Optional
+
 class ImageEditor():
     # Expects a PIL image
-    def editImage(image):
+    def editImage(image : PIL.Image.Image) -> Optional[PIL.Image.Image]:
         temp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
         tempPath = temp.name
     

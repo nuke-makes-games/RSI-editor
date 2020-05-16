@@ -5,11 +5,13 @@ import PySide2.QtWidgets as QtW
 from .ItemAction import ItemAction
 from .State import ImageRole
 
+from typing import Optional
+
 # Like a table, but does animation summaries
 class AnimationView(QtW.QTableView):
     modelChanged = QtC.Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent : Optional[QtC.QObject] =None):
         QtW.QTableView.__init__(self, parent)
 
         self.setSortingEnabled(False)
@@ -19,11 +21,11 @@ class AnimationView(QtW.QTableView):
         self.verticalHeader().setSectionResizeMode(QtW.QHeaderView.ResizeToContents)
         self.setContextMenuPolicy(QtC.Qt.ActionsContextMenu)
 
-    def setModel(self, model):
+    def setModel(self, model : Optional[QtC.QAbstractItemModel]) -> None:
         QtW.QTableView.setModel(self, model)
         self.modelChanged.emit()
 
-    def addItemAction(self, actionText):
+    def addItemAction(self, actionText : str) -> QtW.QAction:
         action = ItemAction(actionText, self)
         self.addAction(action)
         return action

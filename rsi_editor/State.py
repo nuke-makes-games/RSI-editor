@@ -1,8 +1,14 @@
 import PySide2.QtCore as QtC
 import PySide2.QtGui as QtG
 
-import PIL as PIL
-import PIL.ImageQt as PILQt
+import PIL as PIL # type: ignore
+import PIL.ImageQt as PILQt # type: ignore
+
+import rsi.state as RSIStatePy
+
+# Typing imports
+from .Rsi import Rsi
+from typing import List, Optional, Tuple
 
 # TODO: Have this be configured by zooming in and out
 iconSize = QtC.QSize(100, 100)
@@ -12,7 +18,10 @@ ImageRole = QtC.Qt.UserRole
 
 # Wrapper class around an RSI state, for use in the editor
 class State(QtC.QAbstractTableModel):
-    def __init__(self, parentRsi, stateName, parent = None):
+    state : RSIStatePy.State
+    animations : List[QtC.QSequentialAnimationGroup]
+
+    def __init__(self, parentRsi : Rsi, stateName : str, parent : Optional[QtC.QObject] = None):
         QtC.QAbstractTableModel.__init__(self, parent)
 
         self.state = parentRsi.states[stateName]
@@ -29,23 +38,23 @@ class State(QtC.QAbstractTableModel):
 
     # Getters
 
-    def name(self):
+    def name(self) -> str:
         return self.state.name
 
-    def directions(self):
+    def directions(self) -> int:
         return self.state.directions
 
     # Convenience function - get pairs of images and delays for the given direction
-    def frames(self, direction):
+    def frames(self, direction : int) -> List[Tuple[PIL.Image.Image, float]]:
         return list(zip(self.state.icons[direction], self.getDelays(direction)))
 
-    def getDelays(self, direction):
+    def getDelays(self, direction : int) -> List[float]:
         if self.state.delays[direction] == []:
-            return [None]
+            return [0.0]
         else:
             return self.state.delays[direction]
 
-    def setDelay(self, index, delay):
+    def setDelay(self, index : QtC.QModelIndex, delay : float) -> None:
         direction = index.row()
         frame = index.column() 
         
@@ -59,10 +68,10 @@ class State(QtC.QAbstractTableModel):
 
         self.dataChanged.emit(self.index(direction, leftMostChange), self.index(direction, frame), [QtC.Qt.DisplayRole])
 
-    def frame(self, index):
+    def frame(self, index : QtC.QModelIndex) -> PIL.Image.Image:
         return self.data(index, role=ImageRole)
 
-    def setFrame(self, index, image):
+    def setFrame(self, index : QtC.QModelIndex, image : PIL.Image.Image) -> None:
         direction = index.row()
         frame = index.column() 
 
@@ -76,7 +85,7 @@ class State(QtC.QAbstractTableModel):
 
         self.dataChanged.emit(self.index(direction, leftMostChange), self.index(direction, frame), [QtC.Qt.DecorationRole])
 
-    def getDirFrame(self, index):
+    def getDirFrame(self, index : QtC.QModelIndex) -> Optional[Tuple[int, int]]:
         framesInDirection = self.frames(index.row())
         if index.column() >= len(framesInDirection):
             return None
@@ -84,7 +93,7 @@ class State(QtC.QAbstractTableModel):
 
     # Frame manipulations
 
-    def addFrame(self, index, image = None, delay = 0.0):
+    def addFrame(self, index : QtC.QModelIndex, image : Optional[PIL.Image.Image] = None, delay : float = 0.0) -> None:
         if image is None:
             image = PIL.Image.new('RGBA', self.state.size)
 
@@ -103,7 +112,7 @@ class State(QtC.QAbstractTableModel):
         
         self.dataChanged.emit(index, index.siblingAtColumn(self.columnCount(QtC.QModelIndex()) - 1))
 
-    def deleteFrame(self, index):
+    def deleteFrame(self, index : QtC.QModelIndex) -> Tuple[PIL.Image.Image, float]:
         removeColumn = True
         columnCount = self.columnCount(QtC.QModelIndex()) - 1
         for direction in range(self.directions()):
@@ -131,7 +140,7 @@ class State(QtC.QAbstractTableModel):
     # Direction manipulations
 
     ## Returns: ( <removed icon lists>, <removed delay lists> )
-    def setDirections(self, directions):
+    def setDirections(self, directions : int) -> Tuple[List[List[PIL.Image.Image]], List[List[float]]]:
         if self.directions() == directions:
             return ([], [])
 
@@ -177,10 +186,10 @@ class State(QtC.QAbstractTableModel):
 
     # Model functions
 
-    def rowCount(self, _parent):
+    def rowCount(self, _parent : QtC.QModelIndex = QtC.QModelIndex()) -> int:
         return self.directions()
 
-    def columnCount(self, _parent):
+    def columnCount(self, _parent : QtC.QModelIndex = QtC.QModelIndex()) -> int:
         longestDirection = 0
 
         for i in range(self.directions()):
@@ -188,12 +197,12 @@ class State(QtC.QAbstractTableModel):
 
         return longestDirection + 1
 
-    def index(self, row, column, parent=QtC.QModelIndex()):
+    def index(self, row : int, column : int, parent : QtC.QModelIndex = QtC.QModelIndex()) -> QtC.QModelIndex:
         if column < self.columnCount(parent) and row < self.rowCount(parent):
             return self.createIndex(row, column)
         return QtC.QModelIndex()
 
-    def data(self, index, role=QtC.Qt.DisplayRole):
+    def data(self, index : QtC.QModelIndex, role : int = QtC.Qt.DisplayRole) -> object:
         dirFrame = self.getDirFrame(index)
 
         if dirFrame is not None:
@@ -212,6 +221,8 @@ class State(QtC.QAbstractTableModel):
                 return frameIcon
             if role == ImageRole:
                 return frameInfo[0]
+
+            return None
         else:
             if index.column() == self.summaryColumn():
                 if role == QtC.Qt.DecorationRole:
@@ -231,7 +242,7 @@ class State(QtC.QAbstractTableModel):
             return None
 
     # TODO: Nice icons for directions
-    def headerData(self, section, orientation, role=QtC.Qt.DisplayRole):
+    def headerData(self, section : int, orientation : QtC.Qt.Orientation, role : int = QtC.Qt.DisplayRole) -> object:
         if orientation == QtC.Qt.Vertical:
             if self.rowCount(QtC.QModelIndex()) == 1:
                 if role == QtC.Qt.DisplayRole:
@@ -266,14 +277,14 @@ class State(QtC.QAbstractTableModel):
                 return f'Frame {section + 1}'
             return None
 
-    def flags(self, index):
+    def flags(self, index : QtC.QModelIndex) -> QtC.Qt.ItemFlags:
         if self.getDirFrame(index) is not None:
             return QtC.Qt.ItemIsSelectable | QtC.Qt.ItemIsEditable | QtC.Qt.ItemIsEnabled | QtC.Qt.ItemNeverHasChildren
         if index.column() == self.summaryColumn():
             return QtC.Qt.ItemNeverHasChildren | QtC.Qt.ItemIsEnabled
         return QtC.Qt.ItemNeverHasChildren
 
-    def setData(self, index, value, role=QtC.Qt.EditRole):
+    def setData(self, index : QtC.QModelIndex, value : object, role : int = QtC.Qt.EditRole) -> bool:
         dirFrame = self.getDirFrame(index)
 
         if dirFrame is None:
@@ -288,19 +299,24 @@ class State(QtC.QAbstractTableModel):
                 except ValueError:
                     return False
 
-            if self.setDelay(direction, frame, value):
-                self.dataChanged.emit(index, index)
-                return True
-            return False
+            if not isinstance(value, float):
+                return False
+
+            self.setDelay(index, value)
+            self.dataChanged.emit(index, index)
+            return True
 
         if role == ImageRole:
-            self.setImage(direction, frame, value)
+            if not isinstance(value, PIL.Image.Image):
+                return False
+
+            self.setFrame(index, value)
             self.dataChanged.emit(index, index)
             return True
 
         return False
 
-    def frameDataChanged(self, topLeft, bottomRight, roles=list()):
+    def frameDataChanged(self, topLeft : QtC.QModelIndex, bottomRight : QtC.QModelIndex, roles : List[int] = list()) -> None:
         # Some data has changed - so we need to regenerate the
         # animations in the summary. First, we calculate which
         # rows are different now
@@ -311,10 +327,10 @@ class State(QtC.QAbstractTableModel):
 
             self.recalculateSummary(rowsChanged)
     
-    def summaryColumn(self):
+    def summaryColumn(self) -> int:
         return self.columnCount(QtC.QModelIndex()) - 1
 
-    def recalculateSummary(self, rowsChanged=None):
+    def recalculateSummary(self, rowsChanged : Optional[range] = None) -> None:
         numRows = self.rowCount(QtC.QModelIndex())
 
         if rowsChanged is None:
@@ -325,12 +341,12 @@ class State(QtC.QAbstractTableModel):
             if numAnims > numRows:
                 self.animations = self.animations[0:numRows]
             else:
-                self.animations = self.animations + ([None] * (numRows - numAnims))
+                self.animations = self.animations + ([QtC.QSequentialAnimationGroup()] * (numRows - numAnims))
 
         for rowIndex in rowsChanged:
             self.generateAnimation(rowIndex)
 
-    def generateAnimation(self, row):
+    def generateAnimation(self, row : int) -> None:
         animGroup = QtC.QSequentialAnimationGroup(parent=self)
 
         for column in range(self.columnCount(QtC.QModelIndex())):
@@ -355,13 +371,13 @@ class State(QtC.QAbstractTableModel):
 # Special kind of animation that does nothing other than hold on to an index
 # so that we can track it later
 class SummaryFrame(QtC.QAbstractAnimation):
-    def __init__(self, index, delay, parent=None):
+    def __init__(self, index : QtC.QModelIndex, delay : float, parent : QtC.QObject = None):
         QtC.QAbstractAnimation.__init__(self, parent)
         self.index = index
         self.delay = delay
 
-    def duration(self):
-        return self.delay * 1000
+    def duration(self) -> int:
+        return int(self.delay * 1000)
 
-    def updateCurrentTime(self, time):
+    def updateCurrentTime(self, time : float) -> None:
         return
