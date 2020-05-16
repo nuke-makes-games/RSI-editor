@@ -13,13 +13,9 @@ from typing import List, Optional, Tuple
 # TODO: Have this be configured by zooming in and out
 iconSize = QtC.QSize(100, 100)
 
-# Custom view/model role - for getting and setting PIL Images
-ImageRole = QtC.Qt.UserRole
-
 # Wrapper class around an RSI state, for use in the editor
 class State(QtC.QAbstractTableModel):
-    state : RSIStatePy.State
-    animations : List[QtC.QSequentialAnimationGroup]
+    delayChanged = QtC.Signal(QtC.QModelIndex, float)    
 
     def __init__(self, parentRsi : Rsi, stateName : str, parent : Optional[QtC.QObject] = None):
         QtC.QAbstractTableModel.__init__(self, parent)
@@ -54,6 +50,14 @@ class State(QtC.QAbstractTableModel):
         else:
             return self.state.delays[direction]
 
+    def delay(self, index: QtC.QModelIndex) -> Optional[float]:
+        dirFrame = self.getDirFrame(index)
+
+        if dirFrame is not None:
+            direction, frame = dirFrame
+            return self.state.delays[direction][frame]
+        return None
+
     def setDelay(self, index : QtC.QModelIndex, delay : float) -> None:
         direction = index.row()
         frame = index.column() 
@@ -68,8 +72,14 @@ class State(QtC.QAbstractTableModel):
 
         self.dataChanged.emit(self.index(direction, leftMostChange), self.index(direction, frame), [QtC.Qt.DisplayRole])
 
-    def frame(self, index : QtC.QModelIndex) -> PIL.Image.Image:
-        return self.data(index, role=ImageRole)
+    def frame(self, index : QtC.QModelIndex) -> Optional[PIL.Image.Image]:
+        dirFrame = self.getDirFrame(index)
+
+        if dirFrame is not None:
+            (direction, frame) = dirFrame
+            return self.state.icons[direction][frame]
+
+        return None
 
     def setFrame(self, index : QtC.QModelIndex, image : PIL.Image.Image) -> None:
         direction = index.row()
@@ -219,8 +229,6 @@ class State(QtC.QAbstractTableModel):
                 frameIcon = QtG.QIcon(framePixmap)
 
                 return frameIcon
-            if role == ImageRole:
-                return frameInfo[0]
 
             return None
         else:
@@ -302,18 +310,8 @@ class State(QtC.QAbstractTableModel):
             if not isinstance(value, float):
                 return False
 
-            self.setDelay(index, value)
-            self.dataChanged.emit(index, index)
+            self.delayChanged.emit(index, value)
             return True
-
-        if role == ImageRole:
-            if not isinstance(value, PIL.Image.Image):
-                return False
-
-            self.setFrame(index, value)
-            self.dataChanged.emit(index, index)
-            return True
-
         return False
 
     def frameDataChanged(self, topLeft : QtC.QModelIndex, bottomRight : QtC.QModelIndex, roles : List[int] = list()) -> None:

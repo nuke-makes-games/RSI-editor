@@ -233,6 +233,8 @@ class EditorWindow(QtW.QMainWindow):
             self.stateContents.setModel(self.currentState)
             self.stateContents.setEnabled(True)
 
+            self.currentState.delayChanged.connect(self.setFrameDelay)
+
             self.directionGroup.setEnabled(True)
 
             for action in self.directionGroup.actions():
@@ -347,6 +349,8 @@ class EditorWindow(QtW.QMainWindow):
 
     def stateContentsEdit(self, stateIndex : QtC.QModelIndex) -> None:
         image = self.stateContents.model().frame(stateIndex)
+        assert image is not None
+
         edited = ImageEditor.editImage(image)
 
         if edited is not None:
@@ -357,6 +361,12 @@ class EditorWindow(QtW.QMainWindow):
 
     def stateContentsDeleteFrame(self, stateIndex : QtC.QModelIndex) -> None:
         self.undoStack.push(DeleteFrameCommand(self, stateIndex))
+
+    def setFrameDelay(self, frameIndex : QtC.QModelIndex, delay : float) -> None:
+        assert self.currentState is not None
+
+        if self.currentState.delay(frameIndex) != delay:
+            self.undoStack.push(EditDelayCommand(self, frameIndex, delay))
 
     def renameState(self, oldStateName : str, newStateName : str) -> None:
         if oldStateName != newStateName:
@@ -616,6 +626,35 @@ class DeleteFrameCommand(QtW.QUndoCommand):
         assert self.deleted is not None
 
         self.editor.currentState.addFrame(self.frameIndex, self.deleted[0], self.deleted[1])
+
+class EditDelayCommand(QtW.QUndoCommand):
+    def __init__(self, editor : EditorWindow, frameIndex : QtC.QModelIndex, delay : float):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.frameIndex = frameIndex
+        self.newDelay = delay
+        self.oldDelay : Optional[float] = None
+
+    def id(self) -> int:
+        return -1
+
+    def text(self) -> str:
+        return 'Set frame delay'
+
+    def redo(self) -> None:
+        assert self.editor.currentState is not None
+
+        self.oldDelay = self.editor.currentState.delay(self.frameIndex)
+        assert self.oldDelay is not None 
+        
+        self.editor.currentState.setDelay(self.frameIndex, self.newDelay)
+
+    def undo(self) -> None:
+        assert self.editor.currentState is not None
+        assert self.oldDelay is not None 
+        
+        self.editor.currentState.setDelay(self.frameIndex, self.oldDelay)
 
 class EditFrameCommand(QtW.QUndoCommand):
     def __init__(self, editor : EditorWindow, frameIndex : QtC.QModelIndex, unedited : PIL.Image.Image, edited : PIL.Image.Image):

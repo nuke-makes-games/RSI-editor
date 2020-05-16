@@ -3,7 +3,6 @@ import PySide2.QtGui as QtG
 import PySide2.QtWidgets as QtW
 
 from .ItemAction import ItemAction
-from .State import ImageRole
 
 from typing import Optional
 
