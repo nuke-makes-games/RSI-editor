@@ -94,8 +94,10 @@ class EditorWindow(QtW.QMainWindow):
 
         undoHistory = QtW.QUndoView(parent=undoMenu)
         undoHistory.setStack(self.undoStack)
+        undoAction = QtW.QWidgetAction(undoMenu)
+        undoAction.setDefaultWidget(undoHistory)
 
-        undoMenu.addAction(QtW.QWidgetAction(undoHistory))
+        undoMenu.addAction(undoAction)
 
         editMenu.addSeparator()
 
@@ -404,11 +406,10 @@ class SetLicenseCommand(QtW.QUndoCommand):
         self.oldLicense = oldLicense
         self.newLicense = newLicense
 
+        self.setText('Edit license')
+
     def id(self) -> int:
         return SetLicenseCommandId
-
-    def text(self) -> str:
-        return 'Edit license'
 
     def mergeWith(self, other : QtW.QUndoCommand) -> bool:
         if other.id() != self.id():
@@ -434,11 +435,10 @@ class SetCopyrightCommand(QtW.QUndoCommand):
         self.oldCopyright = oldCopyright
         self.newCopyright = newCopyright
 
+        self.setText('Edit copyright')
+
     def id(self) -> int:
         return SetCopyrightCommandId
-
-    def text(self) -> str:
-        return 'Edit copyright'
 
     def mergeWith(self, other : QtW.QUndoCommand) -> bool:
         if other.id() != self.id():
@@ -471,12 +471,12 @@ class NewStateCommand(QtW.QUndoCommand):
             newStateNumber = newStateNumber + 1
 
         self.newStateName = f'NewState{newStateNumber}'
+        
+        self.setText('Create new state')
 
     def id(self) -> int:
         return -1
 
-    def text(self) -> str:
-        return 'Create new state'
 
     def redo(self) -> None: 
         assert self.editor.currentRsi is not None
@@ -497,12 +497,11 @@ class DeleteStateCommand(QtW.QUndoCommand):
 
         # Deliberately don't define this, because redo() is always called first!
         self.deleted : Optional[RSIPy.State] = None
+        
+        self.setText('Delete state')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Delete state'
 
     def redo(self) -> None:
         assert self.editor.currentRsi is not None
@@ -523,12 +522,11 @@ class RenameStateCommand(QtW.QUndoCommand):
         self.oldStateName = oldStateName
         self.newStateName = newStateName
         self.overwritten : Optional[RSIPy.State] = None
+        
+        self.setText('Rename state')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Rename state'
 
     def redo(self) -> None:
         assert self.editor.currentRsi is not None
@@ -553,12 +551,11 @@ class SetDirectionsCommand(QtW.QUndoCommand):
         self.oldDirections = 0
         self.oldIcons : List[List[PIL.Image.Image]] = []
         self.oldDelays : List[List[float]] = []
+        
+        self.setText('Set number of directions')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Set number of directions'
 
     def redo(self) -> None:
         assert self.editor.currentState is not None
@@ -583,12 +580,11 @@ class NewFrameCommand(QtW.QUndoCommand):
 
         self.editor = editor
         self.frameIndex = frameIndex
+        
+        self.setText('Add frame')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Add frame'
 
     def redo(self) -> None:
         assert self.editor.currentState is not None
@@ -609,12 +605,11 @@ class DeleteFrameCommand(QtW.QUndoCommand):
 
         # Deliberately don't define this, because redo() is always called first!
         self.deleted : Optional[Tuple[PIL.Image.Image, float]] = None
+        
+        self.setText('Delete frame')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Delete frame'
 
     def redo(self) -> None:
         assert self.editor.currentState is not None
@@ -635,12 +630,11 @@ class EditDelayCommand(QtW.QUndoCommand):
         self.frameIndex = frameIndex
         self.newDelay = delay
         self.oldDelay : Optional[float] = None
+        
+        self.setText('Set frame delay')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Set frame delay'
 
     def redo(self) -> None:
         assert self.editor.currentState is not None
@@ -664,12 +658,11 @@ class EditFrameCommand(QtW.QUndoCommand):
         self.frameIndex = frameIndex
         self.unedited = unedited
         self.edited = edited
+        
+        self.setText('Edit frame')
 
     def id(self) -> int:
         return -1
-
-    def text(self) -> str:
-        return 'Edit frame'
 
     def redo(self) -> None:
         assert self.editor.currentState is not None
