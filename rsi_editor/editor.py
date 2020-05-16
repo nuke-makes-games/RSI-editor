@@ -18,6 +18,7 @@ class EditorWindow(QtW.QMainWindow):
         self.setWindowTitle("RSI editor[*]")
 
         self.undoStack = QtW.QUndoStack(self)
+        self.undoStack.cleanChanged.connect(lambda clean: self.setWindowModified(not clean))
 
         self.editorMenu()
 
@@ -113,7 +114,6 @@ class EditorWindow(QtW.QMainWindow):
         # TODO: important actions
 
         insertFrameAction = self.stateContents.addItemAction("Add frame")
-        #insertFrameAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None)
         insertFrameAction.indexTriggered.connect(self.stateContentsAddFrame)
 
         deleteFrameAction = self.stateContents.addItemAction("Delete frame")
@@ -241,7 +241,6 @@ class EditorWindow(QtW.QMainWindow):
         # TODO: get RSI size values in input
         self.currentRsi = Rsi.new(32, 32)
         self.setWindowFilePath('')
-        self.setWindowModified(False)
         self.reloadRsi()
 
     @QtC.Slot()
@@ -256,7 +255,6 @@ class EditorWindow(QtW.QMainWindow):
 
         self.currentRsi = Rsi.fromFile(rsiFile)
         self.setWindowFilePath(rsiFile)
-        self.setWindowModified(False)
 
         self.reloadRsi()
 
@@ -265,10 +263,11 @@ class EditorWindow(QtW.QMainWindow):
         if self.currentRsi is None:
             return False
 
-        if self.windowFilePath() is None and not self.setRsiPath():
+        if self.windowFilePath() == '' and not self.setRsiPath():
             return False
 
         self.currentRsi.save(self.windowFilePath())
+        self.undoStack.setClean()
         return True
 
     @QtC.Slot()
@@ -293,7 +292,6 @@ class EditorWindow(QtW.QMainWindow):
 
         self.currentRsi = Rsi.fromDmi(dmiFile)
         self.setWindowFilePath('')
-        self.setWindowModified(True)
 
         self.reloadRsi()
 
@@ -307,7 +305,7 @@ class EditorWindow(QtW.QMainWindow):
         return True
 
     def closeCurrentRsi(self):
-        if self.currentRsi is not None and self.isWindowModified():
+        if self.currentRsi is not None and not self.undoStack.isClean():
             confirmCloseReply = QtW.QMessageBox.question(
                     self,
                     'Close without saving?',
@@ -329,6 +327,8 @@ class EditorWindow(QtW.QMainWindow):
             self.currentState = None
             self.reloadRsi()
 
+            self.undoStack.clear()
+
         return response
 
     @QtC.Slot()
@@ -343,42 +343,35 @@ class EditorWindow(QtW.QMainWindow):
         edited = ImageEditor.editImage(image)
 
         if edited is not None:
-            self.stateContents.model().setFrame(stateIndex, edited)
-            self.setWindowModified(True)
+            self.undoStack.push(EditFrameCommand(self, stateIndex, image, edited))
 
     @QtC.Slot()
     def stateContentsAddFrame(self, stateIndex):
         self.undoStack.push(NewFrameCommand(self, stateIndex))
-        self.setWindowModified(True)
 
     @QtC.Slot()
     def stateContentsDeleteFrame(self, stateIndex):
         self.undoStack.push(DeleteFrameCommand(self, stateIndex))
-        self.setWindowModified(True)
 
     @QtC.Slot()
     def renameState(self, oldStateName, newStateName):
         if oldStateName != newStateName:
             self.undoStack.push(RenameStateCommand(self, oldStateName, newStateName))
-            self.setWindowModified(True)
 
     @QtC.Slot()
     def deleteState(self, stateName):
         if stateName in self.currentRsi.states:
             self.undoStack.push(DeleteStateCommand(self, stateName))
-            self.setWindowModified(True)
 
     @QtC.Slot()
     def updateLicense(self):
         if self.licenseInput.text() != self.currentRsi.license:
             self.undoStack.push(SetLicenseCommand(self, self.currentRsi.license, self.licenseInput.text()))
-            self.setWindowModified(True)
 
     @QtC.Slot()
     def updateCopyright(self):
         if self.copyrightInput.text() != self.currentRsi.copyright:
             self.undoStack.push(SetCopyrightCommand(self, self.currentRsi.copyright, self.copyrightInput.text()))
-            self.setWindowModified(True)
 
 ##############################
 ### COMMANDS FOR UNDO/REDO ###
@@ -537,8 +530,8 @@ class SetDirectionsCommand(QtW.QUndoCommand):
 
         for i in range(self.numDirections, self.oldDirections):
             for j in range(len(self.oldIcons[i - self.numDirections])):
-                self.editor.currentState.setImage(i, j, self.oldIcons[i - self.numDirections][j])
-                self.editor.currentState.setDelay(i, j, self.oldDelays[i - self.numDirections][j])
+                self.editor.currentState.setFrame(self.editor.currentState.index(i, j), self.oldIcons[i - self.numDirections][j])
+                self.editor.currentState.setDelay(self.editor.currentState.index(i, j), self.oldDelays[i - self.numDirections][j])
 
 
 class NewFrameCommand(QtW.QUndoCommand):
@@ -581,6 +574,27 @@ class DeleteFrameCommand(QtW.QUndoCommand):
 
     def undo(self):
         self.editor.currentState.addFrame(self.frameIndex, self.deleted[0], self.deleted[1])
+
+class EditFrameCommand(QtW.QUndoCommand):
+    def __init__(self, editor, frameIndex, unedited, edited):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.frameIndex = frameIndex
+        self.unedited = unedited
+        self.edited = edited
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Edit frame'
+
+    def redo(self):
+        self.editor.currentState.setFrame(self.frameIndex, self.edited)
+
+    def undo(self):
+        self.editor.currentState.setFrame(self.frameIndex, self.unedited)
 
 def editor():
     app = QtW.QApplication([])

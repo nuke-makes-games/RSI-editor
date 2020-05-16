@@ -45,16 +45,36 @@ class State(QtC.QAbstractTableModel):
         else:
             return self.state.delays[direction]
 
-    def setDelay(self, direction, frame, delay):
-        # The only way this happens is if there is 1 frame
-        if self.state.delays[direction] == []:
-            self.state.delays[direction] = [delay]
-        else:
-            self.state.delays[direction][frame] = delay
-        return True
+    def setDelay(self, index, delay):
+        direction = index.row()
+        frame = index.column() 
+        
+        leftMostChange = frame
 
-    def setImage(self, direction, frame, image):
+        if len(self.state.delays[direction]) <= frame:
+            leftMostChange = len(self.state.delays[direction])
+            self.state.delays[direction].extend([0.0] * (frame - len(self.state.delays[direction]) + 1))
+
+        self.state.delays[direction][frame] = delay
+
+        self.dataChanged.emit(self.index(direction, leftMostChange), self.index(direction, frame), [QtC.Qt.DisplayRole])
+
+    def frame(self, index):
+        return self.data(index, role=ImageRole)
+
+    def setFrame(self, index, image):
+        direction = index.row()
+        frame = index.column() 
+
+        leftMostChange = frame
+
+        if len(self.state.icons[direction]) <= frame:
+            leftMostChange = len(self.state.icons[direction])
+            self.state.icons[direction].extend([None] * (frame - len(self.state.icons[direction]) + 1))
+
         self.state.icons[direction][frame] = image.copy()
+
+        self.dataChanged.emit(self.index(direction, leftMostChange), self.index(direction, frame), [QtC.Qt.DecorationRole])
 
     def getDirFrame(self, index):
         framesInDirection = self.frames(index.row())
@@ -150,7 +170,7 @@ class State(QtC.QAbstractTableModel):
                 dirIndex = (dirIndex + 1) % (firstInsertion)
 
             self.state.directions = directions
-            
+
             self.endInsertRows()
 
             return ([], [])
@@ -195,11 +215,15 @@ class State(QtC.QAbstractTableModel):
         else:
             if index.column() == self.summaryColumn():
                 if role == QtC.Qt.DecorationRole:
-                    currentFrame = self.animations[index.row()].currentAnimation()
                     # Some directions may have no animation
+                    currentAnim = self.animations[index.row()]
+                    if currentAnim is None:
+                        return None
+
                     # and while the animation *should* never refer to the summary column
                     # it might do if data is fetched between the column being removed
                     # and the new animation being created
+                    currentFrame = currentAnim.currentAnimation()
                     if currentFrame is not None and currentFrame.index.column() != self.summaryColumn():
                         return self.data(currentFrame.index, role)
                 if role == QtC.Qt.DisplayRole:
@@ -276,12 +300,6 @@ class State(QtC.QAbstractTableModel):
 
         return False
 
-    def frame(self, index):
-        return self.data(index, role=ImageRole)
-
-    def setFrame(self, index, image):
-        return self.setData(index, image, role=ImageRole)
-
     def frameDataChanged(self, topLeft, bottomRight, roles=list()):
         # Some data has changed - so we need to regenerate the
         # animations in the summary. First, we calculate which
@@ -323,6 +341,10 @@ class State(QtC.QAbstractTableModel):
                 animGroup.addAnimation(SummaryFrame(currentIndex, frameDelay, parent=self))
             else:
                 break
+
+        previousAnim = self.animations[row]
+        if previousAnim is not None:
+            previousAnim.stop()
 
         animIndex = self.index(row, self.summaryColumn(), QtC.QModelIndex())
         animGroup.currentAnimationChanged.connect(lambda _void: self.dataChanged.emit(animIndex, animIndex, [QtC.Qt.DecorationRole]))
