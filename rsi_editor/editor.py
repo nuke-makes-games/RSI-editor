@@ -358,11 +358,11 @@ class EditorWindow(QtW.QMainWindow):
         if edited is not None:
             self.undoStack.push(EditFrameCommand(self, stateIndex, image, edited))
 
-    def stateContentsAddFrame(self, stateIndex : QtC.QModelIndex) -> None:
-        self.undoStack.push(NewFrameCommand(self, stateIndex))
+    def stateContentsAddFrame(self, frameIndex : QtC.QModelIndex) -> None:
+        self.undoStack.push(NewFrameCommand(self, frameIndex))
 
-    def stateContentsDeleteFrame(self, stateIndex : QtC.QModelIndex) -> None:
-        self.undoStack.push(DeleteFrameCommand(self, stateIndex))
+    def stateContentsDeleteFrame(self, frameIndex : QtC.QModelIndex) -> None:
+        self.undoStack.push(DeleteFrameCommand(self, frameIndex))
 
     def setFrameDelay(self, frameIndex : QtC.QModelIndex, delay : float) -> None:
         assert self.currentState is not None
@@ -376,8 +376,12 @@ class EditorWindow(QtW.QMainWindow):
 
     def deleteState(self, stateName : str) -> None:
         assert self.currentRsi is not None
-
+        
         if stateName in self.currentRsi.states:
+            if self.currentState is not None and self.currentState.name() == stateName:
+                self.currentState = None
+                self.reloadState()
+
             self.undoStack.push(DeleteStateCommand(self, stateName))
 
     def updateLicense(self) -> None:
