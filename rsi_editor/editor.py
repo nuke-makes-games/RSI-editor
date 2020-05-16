@@ -90,6 +90,16 @@ class EditorWindow(QtW.QMainWindow):
 
         editMenu.addSeparator()
 
+        self.directionGroup = QtW.QActionGroup(editMenu)
+
+        for direction in [1, 4, 8]:
+            action = self.directionGroup.addAction(f'{direction} direction{"s" if direction > 1 else ""}')
+            action.setData(direction)
+            editMenu.addAction(action)
+
+        self.directionGroup.setEnabled(False)
+        self.directionGroup.triggered.connect(lambda action: self.undoStack.push(SetDirectionsCommand(self, action.data())))
+
     def contentMenus(self):
         self.stateContentsMenu()
         self.stateListMenu()
@@ -178,8 +188,6 @@ class EditorWindow(QtW.QMainWindow):
             self.stateList.setModel(self.currentRsi)
             self.stateList.setEnabled(True)
 
-            self.stateContents.setEnabled(True)
-
             self.currentRsi.stateRenamed.connect(self.renameState)
 
             (x, y) = self.currentRsi.size
@@ -196,9 +204,6 @@ class EditorWindow(QtW.QMainWindow):
             self.currentRsi.copyrightChanged.connect(lambda : self.copyrightInput.setText(self.currentRsi.copyright))
 
         else:
-            self.stateContents.setModel(None)
-            self.stateContents.setEnabled(False)
-
             self.stateList.setModel(None)
             self.stateList.setEnabled(False)
 
@@ -207,7 +212,26 @@ class EditorWindow(QtW.QMainWindow):
             self.licenseInput.setEnabled(False)
             self.copyrightInput.setText('')
             self.copyrightInput.setEnabled(False)
-    
+
+        self.reloadState()
+
+    def reloadState(self):
+
+        if self.currentState is not None:
+            self.stateContents.setModel(self.currentState)
+            self.stateContents.setEnabled(True)
+
+            self.directionGroup.setEnabled(True)
+
+            for action in self.directionGroup.actions():
+                if action.data() == self.currentState.directions():
+                    action.setChecked(True)
+
+        else:
+            self.stateContents.setModel(None)
+            self.stateContents.setEnabled(False)
+
+
 
     @QtC.Slot()
     def newRsi(self):
@@ -311,7 +335,7 @@ class EditorWindow(QtW.QMainWindow):
     def stateListDrillDown(self, stateListIndex):
         state = self.stateList.model().getState(stateListIndex)
         self.currentState = State(self.currentRsi, state.name)
-        self.stateContents.setModel(self.currentState)
+        self.reloadState()
 
     @QtC.Slot()
     def stateContentsEdit(self, stateIndex):
@@ -486,6 +510,36 @@ class RenameStateCommand(QtW.QUndoCommand):
         self.editor.currentRsi.renameState(self.newStateName, self.oldStateName)
         if self.overwritten != None:
             self.editor.currentRsi.addState(self.newStateName, self.overwritten)
+
+class SetDirectionsCommand(QtW.QUndoCommand):
+    def __init__(self, editor, numDirections):
+        QtW.QUndoCommand.__init__(self)
+
+        self.editor = editor
+        self.numDirections = numDirections
+
+        self.oldDirections = 0
+        self.oldIcons = []
+        self.oldDelays = []
+
+    def id(self):
+        return -1
+
+    def text(self):
+        return 'Set number of directions'
+
+    def redo(self):
+        self.oldDirections = self.editor.currentState.directions()
+        self.oldIcons, self.oldDelays = self.editor.currentState.setDirections(self.numDirections)
+
+    def undo(self):
+        self.editor.currentState.setDirections(self.oldDirections)
+
+        for i in range(self.numDirections, self.oldDirections):
+            for j in range(len(self.oldIcons[i - self.numDirections])):
+                self.editor.currentState.setImage(i, j, self.oldIcons[i - self.numDirections][j])
+                self.editor.currentState.setDelay(i, j, self.oldDelays[i - self.numDirections][j])
+
 
 class NewFrameCommand(QtW.QUndoCommand):
     def __init__(self, editor, frameIndex):

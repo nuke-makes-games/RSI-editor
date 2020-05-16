@@ -85,7 +85,7 @@ class State(QtC.QAbstractTableModel):
 
     def deleteFrame(self, index):
         removeColumn = True
-        columnCount = self.columnCount(QtC.QModelIndex())
+        columnCount = self.columnCount(QtC.QModelIndex()) - 1
         for direction in range(self.directions()):
             if direction == index.row():
                 continue
@@ -97,8 +97,8 @@ class State(QtC.QAbstractTableModel):
         if removeColumn:
             self.beginRemoveColumns(QtC.QModelIndex(), columnCount - 1, columnCount - 1)
 
-        image = self.state.icons[direction].pop(index.column())
-        delay = self.state.delays[direction].pop(index.column())
+        image = self.state.icons[index.row()].pop(index.column())
+        delay = self.state.delays[index.row()].pop(index.column())
         if removeColumn:
             self.endRemoveColumns()
 
@@ -107,6 +107,53 @@ class State(QtC.QAbstractTableModel):
             self.dataChanged.emit(index, index.siblingAtColumn(newColumnCount - 1))
 
         return (image, delay) 
+
+    # Direction manipulations
+
+    ## Returns: ( <removed icon lists>, <removed delay lists> )
+    def setDirections(self, directions):
+        if self.directions() == directions:
+            return ([], [])
+
+        if self.directions() > directions:
+            firstRemoved = directions
+            lastRemoved = self.directions() - 1
+
+            self.beginRemoveRows(QtC.QModelIndex(), firstRemoved, lastRemoved)
+
+            removedIcons = self.state.icons[firstRemoved:lastRemoved + 1]
+            removedDelays = self.state.delays[firstRemoved:lastRemoved + 1]
+
+            self.state.icons = self.state.icons[0:firstRemoved]
+            self.state.delays = self.state.delays[0:firstRemoved]
+
+            self.state.directions = directions
+
+            self.endRemoveRows()
+
+            return (removedIcons, removedDelays)
+        else:
+            firstInsertion = self.directions()
+            lastInsertion = directions - 1
+
+            self.beginInsertRows(QtC.QModelIndex(), firstInsertion, lastInsertion)
+
+
+            # Basically, we extend the short list into the longer list by iterating
+            # over the elements and copying each one until we have the size of list
+            # we want
+            dirIndex = 0
+
+            for i in range(firstInsertion, directions):
+                self.state.icons.insert(i, [ im.copy() for im in self.state.icons[dirIndex]])
+                self.state.delays.insert(i, [ delay for delay in self.state.delays[dirIndex]])
+                dirIndex = (dirIndex + 1) % (firstInsertion)
+
+            self.state.directions = directions
+            
+            self.endInsertRows()
+
+            return ([], [])
 
     # Model functions
 
@@ -258,7 +305,7 @@ class State(QtC.QAbstractTableModel):
         numAnims = len(self.animations)
         if numAnims != numRows:
             if numAnims > numRows:
-                self.animations = self.animations[0..numRows]
+                self.animations = self.animations[0:numRows]
             else:
                 self.animations = self.animations + ([None] * (numRows - numAnims))
 
