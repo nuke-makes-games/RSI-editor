@@ -122,8 +122,6 @@ class EditorWindow(QtW.QMainWindow):
         editorAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None)
         editorAction.indexTriggered.connect(self.stateContentsEdit)
 
-        # TODO: important actions
-
         insertFrameAction = self.stateContents.addItemAction("Add frame")
         insertFrameAction.indexTriggered.connect(self.stateContentsAddFrame)
 
@@ -260,7 +258,6 @@ class EditorWindow(QtW.QMainWindow):
         if size is None:
             return
 
-        # TODO: get RSI size values in input
         self.currentRsi = Rsi.new(size.width(), size.height())
         self.setWindowFilePath('')
         self.reloadRsi()
