@@ -8,6 +8,7 @@ import PIL # type: ignore
 
 import rsi as RSIPy
 
+from .Config import Config, ConfigEditor
 from .ImageEditor import ImageEditor
 from .ItemAction import ItemAction
 from .Rsi import Rsi, iconSize
@@ -26,12 +27,13 @@ class EditorWindow(QtW.QMainWindow):
         QtW.QMainWindow.__init__(self)
         self.setWindowTitle("RSI editor[*]")
 
+        self.config = Config.load()
+
         self.undoStack = QtW.QUndoStack(self)
         self.undoStack.cleanChanged.connect(lambda clean: self.setWindowModified(not clean))
 
         self.editorMenu()
 
-        # TODO: Reload session information
         self.currentRsi : Optional[Rsi] = None
         self.currentState : Optional[State] = None
 
@@ -75,6 +77,7 @@ class EditorWindow(QtW.QMainWindow):
         # TODO: Set up preferences
         preferencesAction = fileMenu.addAction("Preferences")
         preferencesAction.setShortcut(QtG.QKeySequence.Preferences)
+        preferencesAction.triggered.connect(self.editConfig)
 
         editMenu = self.menuBar().addMenu("&Edit")
 
@@ -119,7 +122,8 @@ class EditorWindow(QtW.QMainWindow):
     def stateContentsMenu(self) -> None:
         editorAction = self.stateContents.addItemAction("Open in editor...")
         # Can only edit frames which exist
-        editorAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None)
+        # and while there is an editor configured
+        editorAction.setEnableIf(lambda index: self.stateContents.model().frame(index) is not None and self.config.hasEditor())
         editorAction.indexTriggered.connect(self.stateContentsEdit)
 
         insertFrameAction = self.stateContents.addItemAction("Add frame")
@@ -356,8 +360,9 @@ class EditorWindow(QtW.QMainWindow):
     def stateContentsEdit(self, stateIndex : QtC.QModelIndex) -> None:
         image = self.stateContents.model().frame(stateIndex)
         assert image is not None
+        assert self.config.editorCommand is not None
 
-        edited = ImageEditor.editImage(image)
+        edited = ImageEditor.editImage(image, self.config.editorCommand)
 
         if edited is not None:
             self.undoStack.push(EditFrameCommand(self, stateIndex, image, edited))
@@ -399,6 +404,12 @@ class EditorWindow(QtW.QMainWindow):
 
         if self.copyrightInput.text() != self.currentRsi.copyright:
             self.undoStack.push(SetCopyrightCommand(self, self.currentRsi.copyright, self.copyrightInput.text()))
+
+    def editConfig(self) -> None:
+        configEdited = ConfigEditor(self.config, self).edit()
+
+        if configEdited:
+            self.config.save()
 
 ##############################
 ### COMMANDS FOR UNDO/REDO ###

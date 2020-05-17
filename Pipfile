@@ -11,6 +11,7 @@ pyside2 = "*"
 pillow = "*"
 byondtoolsv3 = "*"
 mypy = "*"
+toml = "*"
 
 [requires]
 python_version = "3.8"
