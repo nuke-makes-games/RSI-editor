@@ -14,6 +14,7 @@ from .Rsi import Rsi, iconSize
 from .State import State
 from .AnimationView import AnimationView
 from .ListView import ListView
+from .SizeDialog import SizeDialog
 
 from typing import List, Optional, Tuple
 
@@ -253,8 +254,14 @@ class EditorWindow(QtW.QMainWindow):
         if not self.closeCurrentRsi():
             return
 
+        sizeDialog = SizeDialog(parent = self)
+        size = sizeDialog.size()
+
+        if size is None:
+            return
+
         # TODO: get RSI size values in input
-        self.currentRsi = Rsi.new(32, 32)
+        self.currentRsi = Rsi.new(size.width(), size.height())
         self.setWindowFilePath('')
         self.reloadRsi()
 
