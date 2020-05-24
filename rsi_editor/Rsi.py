@@ -82,7 +82,7 @@ class Rsi(QtC.QAbstractListModel):
             if stateName in self.states:
                 return False
 
-            state = RSIPy.State(stateName, [], self.size, 1)
+            state = RSIPy.State(stateName, self.size, 1)
 
             currentFinalRow = self.rowCount(QtC.QModelIndex())
 
