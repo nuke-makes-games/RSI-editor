@@ -41,12 +41,12 @@ class Rsi(QtC.QAbstractListModel):
 
     # Convenience function
 
-    def save(self, path : str) -> bool:
+    def save(self, path : str, jsonIndent : Optional[int]) -> bool:
         rsi = RSIPy.Rsi(self.size)
         rsi.states = self.states
         rsi.license = self.license
         rsi.copyright = self.copyright
-        rsi.write(path)
+        rsi.write(path, indent = jsonIndent)
         return True
 
     # Setters - return True if the RSI is changed

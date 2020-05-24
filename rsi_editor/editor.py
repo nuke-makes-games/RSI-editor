@@ -285,7 +285,11 @@ class EditorWindow(QtW.QMainWindow):
         if self.windowFilePath() == '' and not self.setRsiPath():
             return False
 
-        self.currentRsi.save(self.windowFilePath())
+        indent = None
+        if self.config.formatMetadata:
+            indent = self.config.metadataIndent
+
+        self.currentRsi.save(self.windowFilePath(), indent)
         self.undoStack.setClean()
         return True
 

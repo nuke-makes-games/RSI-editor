@@ -5,24 +5,38 @@ import toml
 import PySide2.QtCore as QtC
 import PySide2.QtWidgets as QtW
 
-from typing import MutableMapping, List, Optional
+from typing import Any, MutableMapping, List, Optional
 
 class Config():
     editorCommand : Optional[List[str]]
 
-    def __init__(self, dictionary : MutableMapping[str, str]):
+    def __init__(self, dictionary : MutableMapping[str, Any]):
 
         if 'editor' in dictionary:
             commandString = dictionary['editor']
+
             self.editorCommand = commandString.split()
         else:
             self.editorCommand = None
 
-    def dict(self) -> MutableMapping[str, str]:
+        if 'formatMetadata' in dictionary:
+            self.formatMetadata = dictionary['formatMetadata']
+        else:
+            self.formatMetadata = True
+
+        if 'metadataIndent' in dictionary:
+            self.metadataIndent = dictionary['metadataIndent']
+        else:
+            self.metadataIndent = 4
+
+    def dict(self) -> MutableMapping[str, Any]:
         contents = {}
 
         if self.editorCommand is not None:
             contents['editor'] = ' '.join(self.editorCommand)
+
+        contents['formatMetadata'] = self.formatMetadata
+        contents['metadataIndent'] = self.metadataIndent
 
         return contents
 
@@ -76,25 +90,25 @@ class ConfigEditor(QtW.QDialog):
         configWidget.setLayout(configForm)
         configWidget.sizePolicy().setVerticalPolicy(QtW.QSizePolicy.MinimumExpanding)
 
-        buttonLayout = QtW.QHBoxLayout()
+        self.formatMetadataEdit = QtW.QCheckBox()
+        if config.formatMetadata is not None:
+            self.formatMetadataEdit.setChecked(config.formatMetadata)
 
-        cancelButton = QtW.QPushButton('Cancel')
-        cancelButton.clicked.connect(lambda _checked: self.reject())
-        cancelButton.setDefault(False)
+        configForm.addRow('Format metadata JSON:', self.formatMetadataEdit)
+
+        self.metadataIndentEdit = QtW.QSpinBox()
+        self.metadataIndentEdit.setValue(config.metadataIndent)
         
-        saveButton = QtW.QPushButton('Save')
-        saveButton.clicked.connect(lambda _checked: self.accept())
-        saveButton.setDefault(True)
+        configForm.addRow('JSON indentation level:', self.metadataIndentEdit)
 
-        buttonLayout.addWidget(cancelButton)
-        buttonLayout.addWidget(saveButton)
+        buttonBox = QtW.QDialogButtonBox(QtW.QDialogButtonBox.Cancel
+                             | QtW.QDialogButtonBox.Save)
 
-        buttonsWidget = QtW.QWidget()
-        buttonsWidget.setLayout(buttonLayout)
-        buttonsWidget.setSizePolicy(QtW.QSizePolicy(QtW.QSizePolicy.Preferred, QtW.QSizePolicy.Fixed))
+        buttonBox.accepted.connect(self.accept)
+        buttonBox.rejected.connect(self.reject)
 
         overallLayout.addWidget(configWidget)
-        overallLayout.addWidget(buttonsWidget)
+        overallLayout.addWidget(buttonBox)
 
         self.setLayout(overallLayout)
 
@@ -104,6 +118,8 @@ class ConfigEditor(QtW.QDialog):
 
         if result == QtW.QDialog.Accepted:
             self.config.editorCommand = self.editorCommandEdit.text().split()
+            self.config.formatMetadata = self.formatMetadataEdit.isChecked()
+            self.config.metadataIndent = self.metadataIndentEdit.value()
             return True
         else:
             return False

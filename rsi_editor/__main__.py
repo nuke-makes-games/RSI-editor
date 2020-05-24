@@ -1,5 +1,5 @@
 from .editor import editor
 
-def main() -> None:
+def main() -> int:
     editor()
-
+    return 0
