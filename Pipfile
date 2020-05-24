@@ -7,7 +7,7 @@ verify_ssl = true
 mypy = "*"
 
 [packages]
-rsi-py = "*"
+rsi-py = ">=1.2.1"
 pillow = "*"
 byondtoolsv3 = "*"
 toml = "*"

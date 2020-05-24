@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "dd4844d05c1b0b5ffae6efe127297de1a5b883107f09edeb810b43759d78b7af"
+            "sha256": "3c5017d847a308ad87714e18d64d3c3bd5437e2185b6517d1ff76736cc5cae35"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -98,10 +98,10 @@
         },
         "rsi-py": {
             "hashes": [
-                "sha256:b43957862d18170f12895970018853a21280b11d3cd854f5e618cb8a05375ac8"
+                "sha256:f827285f38388d99afa741370c5f68ecd080f52956364321e746778ebf8df4c1"
             ],
             "index": "pypi",
-            "version": "==1.2.0"
+            "version": "==1.2.1"
         },
         "shiboken2": {
             "hashes": [
