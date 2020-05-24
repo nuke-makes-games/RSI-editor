@@ -225,9 +225,7 @@ class EditorWindow(QtW.QMainWindow):
             self.stateList.setEnabled(False)
 
             self.sizeInfo.setText('')
-            self.licenseInput.setText('')
             self.licenseInput.setEnabled(False)
-            self.copyrightInput.setText('')
             self.copyrightInput.setEnabled(False)
 
         self.reloadState()
