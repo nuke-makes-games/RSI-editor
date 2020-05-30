@@ -10,7 +10,7 @@ import PIL.ImageQt as PILQt # type: ignore
 
 import rsi as RSIPy
 
-from typing import Optional
+from typing import Dict, List, Optional
 
 # TODO: Have this be configured by zooming in and out
 iconSize = QtC.QSize(100, 100)
@@ -103,6 +103,17 @@ class Rsi(QtC.QAbstractListModel):
         self.endRemoveRows()
 
         return state
+
+    def removeStates(self, stateNames : List[str]) -> Dict[str, RSIPy.State]:
+        stateDict = {}
+
+        for name in stateNames:
+            removed = self.removeState(name)
+
+            if removed is not None:
+                stateDict[name] = removed
+
+        return stateDict
 
     def renameState(self, oldStateName : str, newStateName : str) -> bool:
         if not oldStateName in self.states:

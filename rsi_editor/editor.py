@@ -17,7 +17,7 @@ from .AnimationView import AnimationView
 from .ListView import ListView
 from .SizeDialog import SizeDialog
 
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 dmiFileFilter = 'DreamMaker Image (*.dmi)'
@@ -141,7 +141,9 @@ class EditorWindow(QtW.QMainWindow):
         newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self)))
 
         deleteStateAction = self.stateList.addItemAction("Delete state")
-        deleteStateAction.indexTriggered.connect(lambda index: self.deleteState(self.stateList.model().data(index)))
+        deleteStateAction.setAllowMultiple(True)
+        deleteStateAction.setShortcut(QtG.QKeySequence.Delete)
+        deleteStateAction.indexTriggered.connect(self.deleteStates)
 
     def contentLayout(self) -> None:
         splitter = QtW.QSplitter()
@@ -385,15 +387,17 @@ class EditorWindow(QtW.QMainWindow):
         if oldStateName != newStateName:
             self.undoStack.push(RenameStateCommand(self, oldStateName, newStateName))
 
-    def deleteState(self, stateName : str) -> None:
+    def deleteStates(self, states : List[QtC.QModelIndex]) -> None:
         assert self.currentRsi is not None
         
-        if stateName in self.currentRsi.states:
+        stateNames = [ self.currentRsi.getState(index).name for index in states ]
+
+        for stateName in stateNames:
             if self.currentState is not None and self.currentState.name() == stateName:
                 self.currentState = None
                 self.reloadState()
 
-            self.undoStack.push(DeleteStateCommand(self, stateName))
+        self.undoStack.push(DeleteStatesCommand(self, stateNames))
 
     def updateLicense(self) -> None:
         assert self.currentRsi is not None
@@ -509,15 +513,15 @@ class NewStateCommand(QtW.QUndoCommand):
         
         self.editor.currentRsi.removeState(self.newStateName)
 
-class DeleteStateCommand(QtW.QUndoCommand):
-    def __init__(self, editor : EditorWindow, stateName : str):
+class DeleteStatesCommand(QtW.QUndoCommand):
+    def __init__(self, editor : EditorWindow, stateNames : List[str]):
         QtW.QUndoCommand.__init__(self)
 
         self.editor = editor
-        self.stateName = stateName
+        self.stateNames = stateNames
 
         # Deliberately don't define this, because redo() is always called first!
-        self.deleted : Optional[RSIPy.State] = None
+        self.deleted : Optional[Dict[str, RSIPy.State]] = None
         
         self.setText('Delete state')
 
@@ -527,13 +531,14 @@ class DeleteStateCommand(QtW.QUndoCommand):
     def redo(self) -> None:
         assert self.editor.currentRsi is not None
         
-        self.deleted = self.editor.currentRsi.removeState(self.stateName)
+        self.deleted = self.editor.currentRsi.removeStates(self.stateNames)
 
     def undo(self) -> None:
         assert self.editor.currentRsi is not None
         assert self.deleted is not None
 
-        self.editor.currentRsi.addState(self.stateName, self.deleted)
+        for name, state in self.deleted.items():
+            self.editor.currentRsi.addState(name, state)
 
 class RenameStateCommand(QtW.QUndoCommand):
     def __init__(self, editor : EditorWindow, oldStateName : str, newStateName : str):
