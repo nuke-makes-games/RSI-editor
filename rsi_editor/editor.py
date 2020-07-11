@@ -18,9 +18,11 @@ from .ListView import ListView
 from .SizeDialog import SizeDialog
 
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 dmiFileFilter = 'DreamMaker Image (*.dmi)'
+pngFileFilter = 'PNG (*.png)'
 
 class EditorWindow(QtW.QMainWindow):
     def __init__(self : EditorWindow):
@@ -69,8 +71,8 @@ class EditorWindow(QtW.QMainWindow):
 
         fileMenu.addSeparator()
 
-        importAction = fileMenu.addAction("&Import")
-        importAction.triggered.connect(self.importDmi)
+        importDmiAction = fileMenu.addAction("&Import DMI")
+        importDmiAction.triggered.connect(self.importDmi)
 
         fileMenu.addSeparator()
 
@@ -138,7 +140,10 @@ class EditorWindow(QtW.QMainWindow):
 
         newStateAction = self.stateList.addItemAction("Add new state")
         newStateAction.setCheckValid(False)
-        newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self)))
+        newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self, name = None)))
+
+        importPngAction = self.stateList.addItemAction("Import PNG")
+        importPngAction.triggered.connect(self.importPng)
 
         deleteStateAction = self.stateList.addItemAction("Delete state")
         deleteStateAction.setAllowMultiple(True)
@@ -308,13 +313,35 @@ class EditorWindow(QtW.QMainWindow):
         if not self.closeCurrentRsi():
             return
 
-        (dmiFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import DMI', filter=dmiFileFilter)
+        (pngFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import DMI', filter=dmiFileFilter)
 
-        if dmiFile == '':
+        if pngFile == '':
             return
 
         self.currentRsi = Rsi.fromDmi(dmiFile)
         self.setWindowFilePath('')
+
+        self.reloadRsi()
+    
+    def importPng(self) -> None:
+        (pngFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import PNG', filter=pngFileFilter)
+
+        if pngFile == '':
+            return
+        
+        fileName = Path(pngFile).stem
+        
+        self.currentRsi.addState(fileName)
+
+        self.currentState = State(self.currentRsi, fileName)
+        self.stateContentsAddFrame(self.currentState.createIndex(0,0))
+        self.setFrameDelay(self.currentState.createIndex(0,0), 1.0)
+
+        load_image = PIL.Image.open(Path(pngFile))
+        self.currentState.setFrame(self.currentState.createIndex(0,0), load_image)
+
+
+        self.reloadState()
 
         self.reloadRsi()
 
@@ -483,7 +510,7 @@ class SetCopyrightCommand(QtW.QUndoCommand):
         self.editor.currentRsi.setCopyright(self.oldCopyright)
 
 class NewStateCommand(QtW.QUndoCommand):
-    def __init__(self, editor : EditorWindow):
+    def __init__(self, editor : EditorWindow, name):
         QtW.QUndoCommand.__init__(self)
 
         self.editor = editor
@@ -495,7 +522,10 @@ class NewStateCommand(QtW.QUndoCommand):
         while f'NewState{newStateNumber}' in states:
             newStateNumber = newStateNumber + 1
 
-        self.newStateName = f'NewState{newStateNumber}'
+        if name:
+            self.newStateName = f'{name}'
+        else:
+            self.newStateName = f'NewState{newStateNumber}'
         
         self.setText('Create new state')
 
