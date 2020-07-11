@@ -140,7 +140,7 @@ class EditorWindow(QtW.QMainWindow):
 
         newStateAction = self.stateList.addItemAction("Add new state")
         newStateAction.setCheckValid(False)
-        newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self, name = None)))
+        newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self)))
 
         importPngAction = self.stateList.addItemAction("Import PNG")
         importPngAction.triggered.connect(self.importPng)
@@ -313,9 +313,9 @@ class EditorWindow(QtW.QMainWindow):
         if not self.closeCurrentRsi():
             return
 
-        (pngFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import DMI', filter=dmiFileFilter)
+        (dmiFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import DMI', filter=dmiFileFilter)
 
-        if pngFile == '':
+        if dmiFile == '':
             return
 
         self.currentRsi = Rsi.fromDmi(dmiFile)
@@ -510,7 +510,7 @@ class SetCopyrightCommand(QtW.QUndoCommand):
         self.editor.currentRsi.setCopyright(self.oldCopyright)
 
 class NewStateCommand(QtW.QUndoCommand):
-    def __init__(self, editor : EditorWindow, name):
+    def __init__(self, editor : EditorWindow):
         QtW.QUndoCommand.__init__(self)
 
         self.editor = editor
@@ -522,10 +522,7 @@ class NewStateCommand(QtW.QUndoCommand):
         while f'NewState{newStateNumber}' in states:
             newStateNumber = newStateNumber + 1
 
-        if name:
-            self.newStateName = f'{name}'
-        else:
-            self.newStateName = f'NewState{newStateNumber}'
+        self.newStateName = f'NewState{newStateNumber}'
         
         self.setText('Create new state')
 
