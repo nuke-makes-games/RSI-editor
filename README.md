@@ -1,7 +1,7 @@
 # RSI-editor
 ## A metadata editor for Robust Station Images - currently in alpha 
 
-RSI-editor is a GUI for doing visual editing of [RSI files](https://github.com/space-wizards/RSI.py). It is intended to lower the barrier for creating new RSIs, and converting existing DMI files to the RSI format. 
+RSI-editor is a GUI for doing visual editing of [RSI files](https://github.com/space-wizards/RSI.py). It is intended to lower the barrier for creating new RSIs, and converting existing DMI files to the RSI format. Requires Python 3.7 or newer.
 
 ## Usage
 
