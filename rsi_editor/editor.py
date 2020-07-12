@@ -18,9 +18,11 @@ from .ListView import ListView
 from .SizeDialog import SizeDialog
 
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
 rsiFileFilter = 'Robust Station Image (*.rsi);;RSI JSON metadata (*.json)'
 dmiFileFilter = 'DreamMaker Image (*.dmi)'
+pngFileFilter = 'PNG (*.png)'
 
 class EditorWindow(QtW.QMainWindow):
     def __init__(self : EditorWindow):
@@ -69,8 +71,8 @@ class EditorWindow(QtW.QMainWindow):
 
         fileMenu.addSeparator()
 
-        importAction = fileMenu.addAction("&Import")
-        importAction.triggered.connect(self.importDmi)
+        importDmiAction = fileMenu.addAction("&Import DMI")
+        importDmiAction.triggered.connect(self.importDmi)
 
         fileMenu.addSeparator()
 
@@ -139,6 +141,9 @@ class EditorWindow(QtW.QMainWindow):
         newStateAction = self.stateList.addItemAction("Add new state")
         newStateAction.setCheckValid(False)
         newStateAction.triggered.connect(lambda _index: self.undoStack.push(NewStateCommand(self)))
+
+        importPngAction = self.stateList.addItemAction("Import PNG")
+        importPngAction.triggered.connect(self.importPng)
 
         deleteStateAction = self.stateList.addItemAction("Delete state")
         deleteStateAction.setAllowMultiple(True)
@@ -315,6 +320,28 @@ class EditorWindow(QtW.QMainWindow):
 
         self.currentRsi = Rsi.fromDmi(dmiFile)
         self.setWindowFilePath('')
+
+        self.reloadRsi()
+    
+    def importPng(self) -> None:
+        (pngFile, _) = QtW.QFileDialog.getOpenFileName(self, 'Import PNG', filter=pngFileFilter)
+
+        if pngFile == '':
+            return
+        
+        fileName = Path(pngFile).stem
+        
+        self.currentRsi.addState(fileName)
+
+        self.currentState = State(self.currentRsi, fileName)
+        self.stateContentsAddFrame(self.currentState.createIndex(0,0))
+        self.setFrameDelay(self.currentState.createIndex(0,0), 1.0)
+
+        load_image = PIL.Image.open(Path(pngFile))
+        self.currentState.setFrame(self.currentState.createIndex(0,0), load_image)
+
+
+        self.reloadState()
 
         self.reloadRsi()
 
